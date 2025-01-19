@@ -1,7 +1,8 @@
-template <typename CommutativeMonoid, bool PERSISTENT, int NODES>
+template <typename CommutativeMonoid, bool PERSISTENT>
 struct RBST_CommutativeMonoid {
   using Monoid = CommutativeMonoid;
   using X = typename Monoid::value_type;
+  static_assert(Monoid::commute);
 
   struct Node {
     Node *l, *r;
@@ -10,14 +11,13 @@ struct RBST_CommutativeMonoid {
     bool rev;
   };
 
+  const int NODES;
   Node *pool;
   int pid;
   using np = Node *;
 
-  RBST_CommutativeMonoid() : pid(0) {
-    assert(Monoid::commute);
-    pool = new Node[NODES];
-  }
+  RBST_CommutativeMonoid(int NODES) : NODES(NODES), pid(0) { pool = new Node[NODES]; }
+  ~RBST_CommutativeMonoid() { delete[] pool; }
 
   void reset() { pid = 0; }
 

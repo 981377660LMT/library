@@ -1,14 +1,13 @@
+#include "alg/monoid/mul.hpp"
 #include "alg/acted_set/from_monoid.hpp"
 #include "ds/hashmap.hpp"
 
 // モノイド X の作用する集合 S、ハッシュ関数 H：S -> Z
 // x in X, s, t in S に対して x^ns = t を解く
 // [lb, ub) の最初の解をかえす。なければ -1 をかえす。
-template <typename ActedSet, typename F, int MP_SIZE = 20>
+template <typename ActedSet, typename F>
 ll discrete_log_acted(typename ActedSet::A x, typename ActedSet::S s,
                       typename ActedSet::S t, F H, ll lb, ll ub) {
-  static HashMap<bool, MP_SIZE> MP;
-  MP.reset();
   using Mono = typename ActedSet::Monoid_A;
   using X = typename Mono::value_type;
   using S = typename ActedSet::S;
@@ -30,6 +29,8 @@ ll discrete_log_acted(typename ActedSet::A x, typename ActedSet::S s,
   u64 LIM = ub - lb;
 
   ll K = sqrt(LIM) + 1;
+
+  HashMap<char> MP(K);
 
   FOR(k, K) {
     t = ActedSet::act(t, x);

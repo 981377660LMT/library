@@ -1,10 +1,13 @@
 template <typename T>
-int matrix_rank(const int n, const int m, vc<vc<T>> a) {
+int matrix_rank(vc<vc<T>> a, int n = -1, int m = -1) {
+  if (n == 0) return 0;
+  if (n == -1) { n = len(a), m = len(a[0]); }
+  assert(n == len(a) && m == len(a[0]));
   int rk = 0;
   FOR(j, m) {
     if (rk == n) break;
     if (a[rk][j] == 0) {
-      FOR3(i, rk + 1, n) if (a[i][j] != 0) {
+      FOR(i, rk + 1, n) if (a[i][j] != T(0)) {
         swap(a[rk], a[i]);
         break;
       }

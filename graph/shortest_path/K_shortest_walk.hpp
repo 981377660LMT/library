@@ -3,16 +3,16 @@
 #include "graph/reverse_graph.hpp"
 
 // infty<T> 埋めして必ず長さ K にしたものをかえす。
-template <typename T, typename GT, int NODES>
+template <typename T, typename GT>
 vc<T> K_shortest_walk(GT &G, int s, int t, int K) {
-  assert(G.is_directed());
+  static_assert(GT::is_directed);
   int N = G.N;
   auto RG = reverse_graph(G);
   auto [dist, par] = dijkstra<T, decltype(RG)>(RG, t);
   if (dist[s] == infty<T>) { return vc<T>(K, infty<T>); }
 
   using P = pair<T, int>;
-  Meldable_Heap<P, true, NODES> X;
+  Meldable_Heap<P, true, true> X(20 * G.M);
   using np = typename decltype(X)::np;
   vc<np> nodes(N, nullptr);
 

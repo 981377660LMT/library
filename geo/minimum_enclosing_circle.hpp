@@ -2,39 +2,56 @@
 #include "random/shuffle.hpp"
 #include "geo/outcircle.hpp"
 
-// randomize を利用した O(N) アルゴリズム
-// Computational Geometry, Section 4.7
+// randomize を利用した expected O(N) アルゴリズム
+// 座標の 4 乗が登場！オーバーフロー注意！
+// return: {C,0,-1,-1} or {C,i,j,-1} or {C,i,j,k}
+// https://codeforces.com/problemset/problem/119/E
+// https://qoj.ac/contest/1452/problem/7934
 template <typename REAL, typename T>
-Circle<REAL> minimum_enclosing_circle(vc<Point<T>> points) {
-  using C = Circle<REAL>;
-  shuffle(points);
+tuple<Circle<REAL>, int, int, int> minimum_enclosing_circle(vc<Point<T>> points) {
   const int n = len(points);
   assert(n >= 1);
-  if (n == 1) { return C(points[0].x, points[0].y, 0); }
-  auto make2 = [&](int i, int j) -> C {
-    REAL x = (points[i].x + points[j].x) * 0.5;
-    REAL y = (points[i].y + points[j].y) * 0.5;
-    REAL r = dist<REAL, T>(points[i], points[j]) * 0.5;
-    return C(x, y, r);
-  };
-  auto make3 = [&](int i, int j, int k) -> C {
-    return outcircle<REAL, T>(points[i], points[j], points[k]);
+  if (n == 1) {
+    Circle<REAL> C(points[0].x, points[0].y, 0);
+    return {C, 0, -1, -1};
+  }
+  vc<int> I(n);
+  FOR(i, n) I[i] = i;
+  shuffle(I);
+
+  points = rearrange(points, I);
+
+  tuple<int, int, int> c = {0, -1, -1};
+  auto contain = [&](Point<T> p) -> bool {
+    auto [i, j, k] = c;
+    if (j == -1) { return p == points[i]; }
+    if (k == -1) { return (points[i] - p).dot(points[j] - p) <= 0; }
+    return outcircle_side(points[i], points[j], points[k], p) >= 0;
   };
 
-  C c = make2(0, 1);
-  FOR(i, 2, n) {
-    if (c.contain(points[i])) continue;
-    // i を含むという制約で作り直す。
-    // これをやるのは確率 O(1/i) で、O(i) 時間かける。
-    c = make2(0, i);
+  FOR(i, 1, n) {
+    if (contain(points[i])) continue;
+    c = {0, i, -1};
     FOR(j, 1, i) {
-      if (c.contain(points[j])) continue;
-      c = make2(i, j);
+      if (contain(points[j])) continue;
+      c = {i, j, -1};
       FOR(k, j) {
-        if (c.contain(points[k])) continue;
-        c = make3(i, j, k);
+        if (contain(points[k])) continue;
+        c = {i, j, k};
       }
     }
   }
-  return c;
+  auto [i, j, k] = c;
+  if (k == -1) {
+    REAL x1 = points[i].x;
+    REAL y1 = points[i].y;
+    REAL x2 = points[j].x;
+    REAL y2 = points[j].y;
+    Point<REAL> O = {0.5 * (x1 + x2), 0.5 * (y1 + y2)};
+    REAL r = sqrtl((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)) / 2;
+    Circle<REAL> C(O, r);
+    return {C, I[i], I[j], -1};
+  }
+  Circle<REAL> C = outcircle<REAL>(points[i], points[j], points[k]);
+  return {C, I[i], I[j], I[k]};
 }

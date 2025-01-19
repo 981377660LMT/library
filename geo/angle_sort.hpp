@@ -2,44 +2,43 @@
 
 #include "geo/base.hpp"
 
-// 偏角ソートに対する argsort
-template <typename T>
-vector<int> angle_argsort(vector<Point<T>>& P) {
-  vector<int> lower, origin, upper;
-  const Point<T> O = {0, 0};
-  FOR(i, len(P)) {
-    if (P[i] == O) origin.eb(i);
-    elif ((P[i].y < 0) || (P[i].y == 0 && P[i].x > 0)) lower.eb(i);
-    else upper.eb(i);
-  }
-  sort(all(lower), [&](auto& i, auto& j) { return P[i].det(P[j]) > 0; });
-  sort(all(upper), [&](auto& i, auto& j) { return P[i].det(P[j]) > 0; });
-  auto& I = lower;
-  I.insert(I.end(), all(origin));
-  I.insert(I.end(), all(upper));
+// lower: -1, origin: 0, upper: 1, (-pi,pi]
+template <typename T> int lower_or_upper(const Point<T> &p) {
+  if (p.y != 0)
+    return (p.y > 0 ? 1 : -1);
+  if (p.x > 0)
+    return -1;
+  if (p.x < 0)
+    return 1;
+  return 0;
+}
+
+// L<R:-1, L==R:0, L>R:1, (-pi,pi]
+template <typename T> int angle_comp_3(const Point<T> &L, const Point<T> &R) {
+  int a = lower_or_upper(L), b = lower_or_upper(R);
+  if (a != b)
+    return (a < b ? -1 : +1);
+  T det = L.det(R);
+  if (det > 0)
+    return -1;
+  if (det < 0)
+    return 1;
+  return 0;
+}
+
+// 偏角ソートに対する argsort, (-pi,pi]
+template <typename T> vector<int> angle_sort(vector<Point<T>> &P) {
+  vc<int> I(len(P));
+  FOR(i, len(P)) I[i] = i;
+  sort(all(I), [&](auto &L, auto &R) -> bool {
+    return angle_comp_3(P[L], P[R]) == -1;
+  });
   return I;
 }
 
-// 偏角ソートに対する argsort
-template <typename T>
-vector<int> angle_argsort(vector<pair<T, T>>& P) {
+// 偏角ソートに対する argsort, (-pi,pi]
+template <typename T> vector<int> angle_sort(vector<pair<T, T>> &P) {
   vc<Point<T>> tmp(len(P));
   FOR(i, len(P)) tmp[i] = Point<T>(P[i]);
-  return angle_argsort<T>(tmp);
-}
-
-// inplace に偏角ソートする
-// index が欲しい場合は angle_argsort
-template <typename T>
-void angle_sort(vector<Point<T>>& P) {
-  auto I = angle_argsort<T>(P);
-  P = rearrange(P, I);
-}
-
-// inplace に偏角ソートする
-// index が欲しい場合は angle_argsort
-template <typename T>
-void angle_sort(vector<pair<T, T>>& P) {
-  auto I = angle_argsort<T>(P);
-  P = rearrange(P, I);
+  return angle_sort<T>(tmp);
 }

@@ -1,13 +1,13 @@
 #include "graph/strongly_connected_component.hpp"
 
-// (vs, es)
+// (vs, es), size=(n+1,n)
 // https://yukicoder.me/problems/no/1436
 template <typename GT>
 pair<vc<int>, vc<int>> find_odd_cycle(GT& G) {
   int N = G.N;
   vc<int> comp(N);
-  if (G.is_directed()) {
-    comp = strongly_connected_component<decltype(G)>(G).se;
+  if constexpr (GT::is_directed) {
+    comp = strongly_connected_component<GT>(G).se;
   }
   vc<int> dist(2 * N, infty<int>);
   vc<int> par(2 * N, -1); // edge index
@@ -58,6 +58,7 @@ pair<vc<int>, vc<int>> find_odd_cycle(GT& G) {
     assert(l != -1);
     vs = {vs.begin() + l, vs.begin() + r};
     edges = {edges.begin() + l, edges.begin() + r};
+    vs.eb(vs[0]);
     return {vs, edges};
   }
   return {};

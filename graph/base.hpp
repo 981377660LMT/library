@@ -1,4 +1,5 @@
 #pragma once
+#include "ds/hashmap.hpp"
 
 template <typename T>
 struct Edge {
@@ -9,6 +10,7 @@ struct Edge {
 
 template <typename T = int, bool directed = false>
 struct Graph {
+  static constexpr bool is_directed = directed;
   int N, M;
   using cost_type = T;
   using edge_type = Edge<T>;
@@ -38,7 +40,6 @@ struct Graph {
   };
 
   bool is_prepared() { return prepared; }
-  constexpr bool is_directed() { return directed; }
 
   Graph() : N(0), M(0), prepared(0) {}
   Graph(int N) : N(N), M(0), prepared(0) {}
@@ -63,6 +64,7 @@ struct Graph {
     ++M;
   }
 
+#ifdef FASTIO
   // wt, off
   void read_tree(bool wt = false, int off = 1) { read_graph(N - 1, wt, off); }
 
@@ -80,6 +82,7 @@ struct Graph {
     }
     build();
   }
+#endif
 
   void build() {
     assert(!prepared);
@@ -94,8 +97,7 @@ struct Graph {
     csr_edges.resize(indptr.back() + 1);
     for (auto&& e: edges) {
       csr_edges[counter[e.frm]++] = e;
-      if (!directed)
-        csr_edges[counter[e.to]++] = edge_type({e.to, e.frm, e.cost, e.id});
+      if (!directed) csr_edges[counter[e.to]++] = edge_type({e.to, e.frm, e.cost, e.id});
     }
   }
 
@@ -129,6 +131,7 @@ struct Graph {
     return vc_outdeg[v];
   }
 
+#ifdef FASTIO
   void debug() {
     print("Graph");
     if (!prepared) {
@@ -140,34 +143,79 @@ struct Graph {
       FOR(v, N) for (auto&& e: (*this)[v]) print(e.frm, e.to, e.cost, e.id);
     }
   }
+#endif
 
   vc<int> new_idx;
   vc<bool> used_e;
 
   // G における頂点 V[i] が、新しいグラフで i になるようにする
   // {G, es}
-  pair<Graph<T, directed>, vc<int>> rearrange(vc<int> V) {
+  // sum(deg(v)) の計算量になっていて、
+  // 新しいグラフの n+m より大きい可能性があるので注意
+  Graph<T, directed> rearrange(vc<int> V, bool keep_eid = 0) {
     if (len(new_idx) != N) new_idx.assign(N, -1);
-    if (len(used_e) != M) used_e.assign(M, 0);
     int n = len(V);
     FOR(i, n) new_idx[V[i]] = i;
     Graph<T, directed> G(n);
-    vc<int> es;
+    vc<int> history;
     FOR(i, n) {
       for (auto&& e: (*this)[V[i]]) {
+        if (len(used_e) <= e.id) used_e.resize(e.id + 1);
         if (used_e[e.id]) continue;
         int a = e.frm, b = e.to;
         if (new_idx[a] != -1 && new_idx[b] != -1) {
+          history.eb(e.id);
           used_e[e.id] = 1;
-          G.add(new_idx[a], new_idx[b], e.cost);
-          es.eb(e.id);
+          int eid = (keep_eid ? e.id : -1);
+          G.add(new_idx[a], new_idx[b], e.cost, eid);
         }
       }
     }
     FOR(i, n) new_idx[V[i]] = -1;
-    for (auto&& eid: es) used_e[eid] = 0;
+    for (auto&& eid: history) used_e[eid] = 0;
     G.build();
-    return {G, es};
+    return G;
+  }
+
+  Graph<T, true> to_directed_tree(int root = -1) {
+    if (root == -1) root = 0;
+    assert(!is_directed && prepared && M == N - 1);
+    Graph<T, true> G1(N);
+    vc<int> par(N, -1);
+    auto dfs = [&](auto& dfs, int v) -> void {
+      for (auto& e: (*this)[v]) {
+        if (e.to == par[v]) continue;
+        par[e.to] = v, dfs(dfs, e.to);
+      }
+    };
+    dfs(dfs, root);
+    for (auto& e: edges) {
+      int a = e.frm, b = e.to;
+      if (par[a] == b) swap(a, b);
+      assert(par[b] == a);
+      G1.add(a, b, e.cost);
+    }
+    G1.build();
+    return G1;
+  }
+
+  HashMap<int> MP_FOR_EID;
+
+  int get_eid(u64 a, u64 b) {
+    if (len(MP_FOR_EID) == 0) {
+      MP_FOR_EID.build(N - 1);
+      for (auto& e: edges) {
+        u64 a = e.frm, b = e.to;
+        u64 k = to_eid_key(a, b);
+        MP_FOR_EID[k] = e.id;
+      }
+    }
+    return MP_FOR_EID.get(to_eid_key(a, b), -1);
+  }
+
+  u64 to_eid_key(u64 a, u64 b) {
+    if (!directed && a > b) swap(a, b);
+    return N * a + b;
   }
 
 private:

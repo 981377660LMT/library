@@ -1,7 +1,7 @@
 #pragma once
 
 // sparse もあるので状況によってはそっちで
-template <typename Monoid, bool PERSISTENT, int NODES>
+template <typename Monoid, bool PERSISTENT>
 struct Dynamic_SegTree {
   using MX = Monoid;
   using X = typename MX::value_type;
@@ -13,20 +13,23 @@ struct Dynamic_SegTree {
     X x;
   };
 
+  const int NODES;
   const ll L0, R0;
   Node *pool;
   int pid;
   using np = Node *;
 
   Dynamic_SegTree(
-      ll L0, ll R0, F default_prod = [](ll l, ll r) -> X { return MX::unit(); })
-      : default_prod(default_prod), L0(L0), R0(R0), pid(0) {
+      int NODES, ll L0, ll R0, F default_prod = [](ll l, ll r) -> X { return MX::unit(); })
+      : default_prod(default_prod), NODES(NODES), L0(L0), R0(R0), pid(0) {
     pool = new Node[NODES];
   }
+  ~Dynamic_SegTree() { delete[] pool; }
 
   np new_root() { return new_node(L0, R0); }
 
   np new_node(const X x) {
+    assert(pid < NODES);
     pool[pid].l = pool[pid].r = nullptr;
     pool[pid].x = x;
     return &(pool[pid++]);
@@ -60,12 +63,16 @@ struct Dynamic_SegTree {
 
   np set(np root, ll i, const X &x) {
     assert(root && L0 <= i && i < R0);
-    return set_rec(root, L0, R0, i, x);
+    root = (root ? copy_node(root) : new_node());
+    set_rec(root, L0, R0, i, x);
+    return root;
   }
 
   np multiply(np root, ll i, const X &x) {
     assert(root && L0 <= i && i < R0);
-    return multiply_rec(root, L0, R0, i, x);
+    root = (root ? copy_node(root) : new_node());
+    multiply_rec(root, L0, R0, i, x);
+    return root;
   }
 
   template <typename F>
@@ -110,50 +117,48 @@ private:
     return &(pool[pid++]);
   }
 
-  np set_rec(np c, ll l, ll r, ll i, const X &x) {
+  void set_rec(np c, ll l, ll r, ll i, const X &x) {
+    assert(c);
+    // もう c は新しくしてある
     if (r == l + 1) {
-      c = copy_node(c);
       c->x = x;
-      return c;
+      return;
     }
     ll m = (l + r) / 2;
-
-    c = copy_node(c);
-    if (i < m) {
-      if (!c->l) c->l = new_node(l, m);
-      c->l = set_rec(c->l, l, m, i, x);
-    } else {
-      if (!c->r) c->r = new_node(m, r);
-      c->r = set_rec(c->r, m, r, i, x);
+    if (l <= i && i < m) {
+      c->l = (c->l ? copy_node(c->l) : new_node());
+      set_rec(c->l, l, m, i, x);
+    }
+    if (m <= i && i < r) {
+      c->r = (c->r ? copy_node(c->r) : new_node());
+      set_rec(c->r, m, r, i, x);
     }
     X xl = (c->l ? c->l->x : default_prod(l, m));
     X xr = (c->r ? c->r->x : default_prod(m, r));
     c->x = MX::op(xl, xr);
-    return c;
+    return;
   }
 
-  np multiply_rec(np c, ll l, ll r, ll i, const X &x, bool make_copy = true) {
+  void multiply_rec(np c, ll l, ll r, ll i, const X &x) {
+    assert(c);
+    // もう c は新しくしてある
     if (r == l + 1) {
-      if (make_copy) c = copy_node(c);
       c->x = MX::op(c->x, x);
-      return c;
+      return;
     }
     ll m = (l + r) / 2;
-    if (make_copy) c = copy_node(c);
-
-    if (i < m) {
-      bool make = true;
-      if (!c->l) c->l = new_node(l, m), make = false;
-      c->l = multiply_rec(c->l, l, m, i, x, make);
-    } else {
-      bool make = true;
-      if (!c->r) c->r = new_node(m, r), make = false;
-      c->r = multiply_rec(c->r, m, r, i, x, make);
+    if (l <= i && i < m) {
+      c->l = (c->l ? copy_node(c->l) : new_node());
+      multiply_rec(c->l, l, m, i, x);
+    }
+    if (m <= i && i < r) {
+      c->r = (c->r ? copy_node(c->r) : new_node());
+      multiply_rec(c->r, m, r, i, x);
     }
     X xl = (c->l ? c->l->x : default_prod(l, m));
     X xr = (c->r ? c->r->x : default_prod(m, r));
     c->x = MX::op(xl, xr);
-    return c;
+    return;
   }
 
   void prod_rec(np c, ll l, ll r, ll ql, ll qr, X &x) {
@@ -173,6 +178,7 @@ private:
     prod_rec(c->r, m, r, ql, qr, x);
   }
 
+  // これ new node 作ってるのはさぼり
   template <typename F>
   ll max_right_rec(np c, const F &check, ll l, ll r, ll ql, X &x) {
     if (r <= ql) return R0;
@@ -189,6 +195,7 @@ private:
     return max_right_rec(c->r, check, m, r, ql, x);
   }
 
+  // これ new node 作ってるのはさぼり
   template <typename F>
   ll min_left_rec(np c, const F &check, ll l, ll r, ll qr, X &x) {
     if (qr <= l) return L0;

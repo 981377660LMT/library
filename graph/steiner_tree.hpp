@@ -5,7 +5,8 @@
 // O(3^kn + 2^k(n+m)log n), k: terminal size
 template <typename T, typename GT>
 tuple<T, vc<int>, vc<int>> steiner_tree(GT& G, vc<int> S, vc<T> v_wt = {}) {
-  assert(!S.empty() && !G.is_directed());
+  static_assert(!GT::is_directed);
+  assert(!S.empty());
   const int N = G.N, M = G.M, K = len(S);
   if (v_wt.empty()) v_wt.assign(N, 0);
 
@@ -18,11 +19,11 @@ tuple<T, vc<int>, vc<int>> steiner_tree(GT& G, vc<int> S, vc<T> v_wt = {}) {
 
   for (int s = 1; s < (1 << K); ++s) {
     auto& dp = DP[s];
-    enumerate_bits_32(s, [&](int k) -> void {
+    for (int k: all_bit<u32>(s)) {
       int v = S[k];
       chmin(dp[v], DP[s ^ 1 << k][v]);
-    });
-    FOR_subset(t, s) {
+    }
+    for (u32 t: all_subset<u32>(s)) {
       if (t == 0 || t == s) continue;
       FOR(v, N) {
         if (chmin(dp[v], DP[t][v] + DP[s ^ t][v] - v_wt[v])) par[s][v] = 2 * t;

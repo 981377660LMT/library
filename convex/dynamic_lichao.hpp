@@ -1,12 +1,21 @@
+/*
+struct F {
+  using value_type = ll;  // operator() の戻り値
+  int a;
+  ll b;
+  ll operator()(ll x) { return a * x + b; }
+};
+*/
+
 // 直線追加かつ非永続なら空間 Q でよい。
 // 関数は ll -> T。[L, R) 上 f が overflow しないように注意。
 // evaluate を書き変えると、totally monotone な関数群にも使える
-template <typename T, bool PERSISTENT, int NODES, bool MINIMIZE>
+template <typename FUNC, bool PERSISTENT, int NODES, bool MINIMIZE>
 struct Dynamic_LiChao_Tree {
-  using FUNC = pair<T, T>;
+  using T = typename FUNC::value_type;
   vc<FUNC> funcs;
 
-  static inline T evaluate(FUNC &f, ll x) { return f.fi * x + f.se; }
+  static inline T evaluate(FUNC &f, ll x) { return f(x); }
 
   struct Node {
     int fid;
@@ -19,9 +28,7 @@ struct Dynamic_LiChao_Tree {
 
   using np = Node *;
 
-  Dynamic_LiChao_Tree(ll L, ll R) : pid(0), L(L), R(R) {
-    pool = new Node[NODES];
-  }
+  Dynamic_LiChao_Tree(ll L, ll R) : pid(0), L(L), R(R) { pool = new Node[NODES]; }
 
   void reset() {
     funcs.clear();
@@ -36,7 +43,15 @@ struct Dynamic_LiChao_Tree {
     return &(pool[pid++]);
   }
 
-  np add_line(np root, FUNC f) {
+  np chmin_line(np root, FUNC f) {
+    static_assert(MINIMIZE);
+    int fid = len(funcs);
+    funcs.eb(f);
+    if (!root) root = new_node();
+    return add_line_rec(root, fid, L, R);
+  }
+  np chmax_line(np root, FUNC f) {
+    static_assert(!MINIMIZE);
     int fid = len(funcs);
     funcs.eb(f);
     if (!root) root = new_node();
@@ -44,7 +59,16 @@ struct Dynamic_LiChao_Tree {
   }
 
   // [xl, xr)
-  np add_segment(np root, ll xl, ll xr, FUNC f) {
+  np chmin_segment(np root, ll xl, ll xr, FUNC f) {
+    static_assert(MINIMIZE);
+    int fid = len(funcs);
+    funcs.eb(f);
+    if (!root) root = new_node();
+    return add_segment_rec(root, xl, xr, fid, L, R);
+  }
+  // [xl, xr)
+  np chmax_segment(np root, ll xl, ll xr, FUNC f) {
+    static_assert(!MINIMIZE);
     int fid = len(funcs);
     funcs.eb(f);
     if (!root) root = new_node();

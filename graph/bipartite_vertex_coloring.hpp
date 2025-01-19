@@ -4,16 +4,16 @@
 #include "ds/unionfind/unionfind.hpp"
 
 // 二部グラフでなかった場合には empty
-template <typename Graph>
-vc<int> bipartite_vertex_coloring(Graph& G) {
+template <typename GT>
+vc<int> bipartite_vertex_coloring(GT& G) {
+  assert(!GT::is_directed);
   assert(G.is_prepared());
 
   int n = G.N;
   UnionFind uf(2 * n);
   for (auto&& e: G.edges) {
     int u = e.frm, v = e.to;
-    if (e.cost == 0) uf.merge(u, v), uf.merge(u + n, v + n);
-    if (e.cost != 0) uf.merge(u + n, v), uf.merge(u, v + n);
+    uf.merge(u + n, v), uf.merge(u, v + n);
   }
 
   vc<int> color(2 * n, -1);

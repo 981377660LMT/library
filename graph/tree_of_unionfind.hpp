@@ -6,12 +6,13 @@
 q 回目にマージしてできる成分：N+q
 add_root = true の場合：最後に全部をマージして、根 N+Q を追加する
 */
-Graph<int> tree_of_unionfind(int N, vc<pair<int, int>> query, bool add_root) {
-  UnionFind uf(N + len(query));
+Graph<int, 1> tree_of_unionfind(int N, vc<pair<int, int>> query,
+                                bool add_root) {
+  UnionFind uf(N);
   vc<int> root(N);
   iota(all(root), 0);
   int Q = len(query);
-  Graph<int> G(N + Q + add_root);
+  Graph<int, 1> G(N + Q + add_root);
   FOR(q, Q) {
     int v = N + q;
     auto [a, b] = query[q];
@@ -19,8 +20,7 @@ Graph<int> tree_of_unionfind(int N, vc<pair<int, int>> query, bool add_root) {
     G.add(v, root[a]);
     if (b != a) G.add(v, root[b]);
     uf.merge(a, b);
-    uf.merge(b, v);
-    root[uf[v]] = v;
+    root[uf[a]] = v;
   }
   if (add_root) {
     int r = N + Q;

@@ -7,8 +7,7 @@ struct Sliding_Window_Aggregation {
   vc<X> cum_l;
   X cum_r;
 
-  Sliding_Window_Aggregation()
-      : cum_l({Monoid::unit()}), cum_r(Monoid::unit()) {}
+  Sliding_Window_Aggregation() : cum_l({Monoid::unit()}), cum_r(Monoid::unit()) {}
 
   int size() { return sz; }
 
@@ -36,13 +35,6 @@ struct Sliding_Window_Aggregation {
   X rprod() { return cum_r; }
 
   X prod() { return Monoid::op(cum_l.back(), cum_r); }
-
-  void debug() {
-    print("swag");
-    print("dat", dat);
-    print("cum_l", cum_l);
-    print("cum_r", cum_r);
-  }
 };
 
 // 定数倍は目に見えて遅くなるので、queue でよいときは使わない
@@ -96,24 +88,21 @@ struct SWAG_deque {
 
   void pop() { pop_front(); }
 
+  X front() {
+    if (len(dat_l)) return dat_l.back();
+    return dat_r[0];
+  }
+
   X lprod() { return cum_l.back(); }
   X rprod() { return cum_r.back(); }
   X prod() { return Monoid::op(cum_l.back(), cum_r.back()); }
   X prod_all() { return prod(); }
 
-  void debug() {
-    print("swag");
-    print("dat_l", dat_l);
-    print("dat_r", dat_r);
-    print("cum_l", cum_l);
-    print("cum_r", cum_r);
-  }
-
 private:
   void rebuild() {
     vc<X> X;
-    FOR_R(i, len(dat_l)) X.eb(dat_l[i]);
-    X.insert(X.end(), all(dat_r));
+    reverse(all(dat_l));
+    concat(X, dat_l, dat_r);
     clear();
     int m = len(X) / 2;
     FOR_R(i, m) push_front(X[i]);

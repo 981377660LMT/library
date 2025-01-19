@@ -1,23 +1,24 @@
 #pragma once
 
-template <typename T, bool PERSISTENT, int NODES>
+template <typename T, bool PERSISTENT>
 struct Dynamic_Array {
+  static constexpr int LOG = 4;
+  static constexpr int MASK = (1 << LOG) - 1;
   struct Node {
     T x;
-    Node* ch[16] = {};
+    Node* ch[1 << LOG] = {};
   };
+  const int NODES;
   Node* pool;
   int pid;
   using np = Node*;
   const T x0;
 
-  Dynamic_Array(T default_value) : pid(0), x0(default_value) {
-    pool = new Node[NODES];
-  }
-
+  Dynamic_Array(int NODES, T default_value) : NODES(NODES), pid(0), x0(default_value) { pool = new Node[NODES]; }
+  ~Dynamic_Array() { delete[] pool; }
   np new_root() {
     pool[pid].x = x0;
-    fill(pool[pid].ch, pool[pid].ch + 16, nullptr);
+    fill(pool[pid].ch, pool[pid].ch + (1 << LOG), nullptr);
     return &(pool[pid++]);
   }
 
@@ -30,7 +31,7 @@ struct Dynamic_Array {
   T get(np c, int idx) {
     if (!c) return x0;
     if (idx == 0) return c->x;
-    return get(c->ch[idx & 15], (idx - 1) >> 4);
+    return get(c->ch[idx & MASK], (idx - 1) >> LOG);
   }
 
   np set(np c, int idx, T x, bool make_copy = true) {
@@ -39,7 +40,7 @@ struct Dynamic_Array {
       c->x = x;
       return c;
     }
-    c->ch[idx & 15] = set(c->ch[idx & 15], (idx - 1) >> 4, x);
+    c->ch[idx & MASK] = set(c->ch[idx & MASK], (idx - 1) >> LOG, x);
     return c;
   }
 
@@ -47,7 +48,7 @@ private:
   np copy_node(np c, bool make_copy) {
     if (!make_copy || !PERSISTENT) return c;
     pool[pid].x = c->x;
-    FOR(k, 16) pool[pid].ch[k] = c->ch[k];
+    FOR(k, (1 << LOG)) pool[pid].ch[k] = c->ch[k];
     return &(pool[pid++]);
   }
 };

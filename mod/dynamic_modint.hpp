@@ -1,25 +1,10 @@
 #pragma once
+
 #include "mod/modint_common.hpp"
 #include "mod/primitive_root.hpp"
 #include "mod/barrett.hpp"
 
-template <class T>
-using is_signed_int =
-    typename std::conditional<(is_integral<T>::value
-                               && std::is_signed<T>::value),
-                              std::true_type, std::false_type>::type;
-
-template <class T>
-using is_unsigned_int =
-    typename std::conditional<(is_integral<T>::value
-                               && std::is_unsigned<T>::value),
-                              std::true_type, std::false_type>::type;
-template <class T>
-using is_signed_int_t = std::enable_if_t<is_signed_int<T>::value>;
-
-template <class T>
-using is_unsigned_int_t = std::enable_if_t<is_unsigned_int<T>::value>;
-
+template <int id>
 struct Dynamic_Modint {
   static constexpr bool is_modint = true;
   using mint = Dynamic_Modint;
@@ -33,26 +18,24 @@ struct Dynamic_Modint {
     bt = Barrett(m);
   }
 
+  static Dynamic_Modint raw(u32 v) {
+    Dynamic_Modint x;
+    x.val = v;
+    return x;
+  }
   Dynamic_Modint() : val(0) {}
-  template <class T, is_signed_int_t<T>* = nullptr>
-  Dynamic_Modint(T v) {
-    int x = v % get_mod();
-    if (x < 0) x += get_mod();
-    val = u32(x);
-  }
-  template <class T, is_unsigned_int_t<T>* = nullptr>
-  Dynamic_Modint(T v) {
-    val = bt.modulo(v);
-  }
+  Dynamic_Modint(u32 x) : val(bt.modulo(x)) {}
+  Dynamic_Modint(u64 x) : val(bt.modulo(x)) {}
+  Dynamic_Modint(int x) : val((x %= get_mod()) < 0 ? x + get_mod() : x) {}
+  Dynamic_Modint(ll x) : val((x %= get_mod()) < 0 ? x + get_mod() : x) {}
+  Dynamic_Modint(i128 x) : val((x %= get_mod()) < 0 ? x + get_mod() : x){};
 
   mint& operator+=(const mint& rhs) {
-    val += rhs.val;
-    if (val >= umod()) val -= umod();
+    val = (val += rhs.val) < umod() ? val : val - umod();
     return *this;
   }
   mint& operator-=(const mint& rhs) {
-    val += umod() - rhs.val;
-    if (val >= umod()) val -= umod();
+    val = (val += umod() - rhs.val) < umod() ? val : val - umod();
     return *this;
   }
   mint& operator*=(const mint& rhs) {
@@ -66,15 +49,13 @@ struct Dynamic_Modint {
     mint x = *this, r = 1;
     while (n) {
       if (n & 1) r *= x;
-      x *= x;
-      n >>= 1;
+      x *= x, n >>= 1;
     }
     return r;
   }
   mint inverse() const {
-    int x = val;
-    int mod = get_mod();
-    ll a = x, b = mod, u = 1, v = 0, t;
+    int x = val, mod = get_mod();
+    int a = x, b = mod, u = 1, v = 0, t;
     while (b > 0) {
       t = a / b;
       swap(a -= t * b, b), swap(u -= t * v, v);
@@ -101,13 +82,6 @@ struct Dynamic_Modint {
   friend bool operator!=(const mint& lhs, const mint& rhs) {
     return lhs.val != rhs.val;
   }
-#ifdef FASTIO
-  void write() { fastio::printer.write(val); }
-  void read() {
-    fastio::scanner.read(val);
-    assert(0 <= val && val < u32(get_mod()));
-  }
-#endif
   static pair<int, int>& get_ntt() {
     static pair<int, int> p = {-1, -1};
     return p;
@@ -123,5 +97,18 @@ struct Dynamic_Modint {
   static bool can_ntt() { return ntt_info().fi != -1; }
 };
 
-using dmint = Dynamic_Modint;
-Barrett dmint::bt(1);
+#ifdef FASTIO
+template <int id>
+void rd(Dynamic_Modint<id>& x) {
+  fastio::rd(x.val);
+  x.val %= Dynamic_Modint<id>::umod();
+}
+template <int id>
+void wt(Dynamic_Modint<id> x) {
+  fastio::wt(x.val);
+}
+#endif
+
+using dmint = Dynamic_Modint<-1>;
+template <int id>
+Barrett Dynamic_Modint<id>::bt;

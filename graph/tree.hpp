@@ -3,7 +3,6 @@
 #include "graph/base.hpp"
 
 // HLD euler tour をとっていろいろ。
-// 木以外、非連結でも dfs 順序や親がとれる。
 template <typename GT>
 struct Tree {
   using Graph_type = GT;
@@ -79,16 +78,28 @@ struct Tree {
     return P;
   }
 
+  int heavy_child(int v) {
+    int k = LID[v] + 1;
+    if (k == N) return -1;
+    int w = V[k];
+    return (parent[w] == v ? w : -1);
+  }
+
   int e_to_v(int eid) {
     auto e = G.edges[eid];
     return (parent[e.frm] == e.to ? e.frm : e.to);
   }
   int v_to_e(int v) { return VtoE[v]; }
+  int get_eid(int u, int v) {
+    if (parent[u] != v) swap(u, v);
+    assert(parent[u] == v);
+    return VtoE[u];
+  }
 
   int ELID(int v) { return 2 * LID[v] - depth[v]; }
   int ERID(int v) { return 2 * RID[v] - depth[v] - 1; }
 
-  /* k: 0-indexed */
+  // 目標地点へ進む個数が k
   int LA(int v, int k) {
     assert(k <= depth[v]);
     while (1) {
@@ -106,12 +117,9 @@ struct Tree {
       if (head[u] == head[v]) return u;
     }
   }
-  // root を根とした場合の lca
-  int LCA_root(int u, int v, int root) {
-    return LCA(u, v) ^ LCA(u, root) ^ LCA(v, root);
-  }
+
+  int meet(int a, int b, int c) { return LCA(a, b) ^ LCA(a, c) ^ LCA(b, c); }
   int lca(int u, int v) { return LCA(u, v); }
-  int lca_root(int u, int v, int root) { return LCA_root(u, v, root); }
 
   int subtree_size(int v, int root = -1) {
     if (root == -1) return RID[v] - LID[v];
@@ -154,6 +162,17 @@ struct Tree {
     return res;
   }
 
+  vc<int> collect_light(int v) {
+    vc<int> res;
+    bool skip = true;
+    for (auto &&e: G[v])
+      if (e.to != parent[v]) {
+        if (!skip) res.eb(e.to);
+        skip = false;
+      }
+    return res;
+  }
+
   vc<pair<int, int>> get_path_decomposition(int u, int v, bool edge) {
     // [始点, 終点] の"閉"区間列。
     vc<pair<int, int>> up, down;
@@ -174,6 +193,27 @@ struct Tree {
     return up;
   }
 
+  // 辺の列の情報 (frm,to,str)
+  // str = "heavy_up", "heavy_down", "light_up", "light_down"
+  vc<tuple<int, int, string>> get_path_decomposition_detail(int u, int v) {
+    vc<tuple<int, int, string>> up, down;
+    while (1) {
+      if (head[u] == head[v]) break;
+      if (LID[u] < LID[v]) {
+        if (v != head[v]) down.eb(head[v], v, "heavy_down"), v = head[v];
+        down.eb(parent[v], v, "light_down"), v = parent[v];
+      } else {
+        if (u != head[u]) up.eb(u, head[u], "heavy_up"), u = head[u];
+        up.eb(u, parent[u], "light_up"), u = parent[u];
+      }
+    }
+    if (LID[u] < LID[v]) down.eb(u, v, "heavy_down");
+    elif (LID[v] < LID[u]) up.eb(u, v, "heavy_up");
+    reverse(all(down));
+    concat(up, down);
+    return up;
+  }
+
   vc<int> restore_path(int u, int v) {
     vc<int> P;
     for (auto &&[a, b]: get_path_decomposition(u, v, 0)) {
@@ -184,5 +224,35 @@ struct Tree {
       }
     }
     return P;
+  }
+
+  // path [a,b] と [c,d] の交わり. 空ならば {-1,-1}.
+  // https://codeforces.com/problemset/problem/500/G
+  pair<int, int> path_intersection(int a, int b, int c, int d) {
+    int ab = lca(a, b), ac = lca(a, c), ad = lca(a, d);
+    int bc = lca(b, c), bd = lca(b, d), cd = lca(c, d);
+    int x = ab ^ ac ^ bc, y = ab ^ ad ^ bd; // meet(a,b,c), meet(a,b,d)
+    if (x != y) return {x, y};
+    int z = ac ^ ad ^ cd;
+    if (x != z) x = -1;
+    return {x, x};
+  }
+
+  // uv path 上で check(v) を満たす最後の v
+  // なければ （つまり check(v) が ng ）-1
+  template <class F>
+  int max_path(F check, int u, int v) {
+    if (!check(u)) return -1;
+    auto pd = get_path_decomposition(u, v, false);
+    for (auto [a, b]: pd) {
+      if (!check(V[a])) return u;
+      if (check(V[b])) {
+        u = V[b];
+        continue;
+      }
+      int c = binary_search([&](int c) -> bool { return check(V[c]); }, a, b, 0);
+      return V[c];
+    }
+    return u;
   }
 };

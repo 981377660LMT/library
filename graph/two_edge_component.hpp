@@ -1,9 +1,10 @@
 #include "graph/base.hpp"
 
 // (成分数, 成分番号の vector)
+// 連結じゃなくても OK
 template <typename GT>
 pair<int, vc<int>> two_edge_component(GT& G) {
-  assert(!G.is_directed());
+  static_assert(!GT::is_directed);
   int N = G.N, M = G.M, n_comp = 0;
   vc<int> V, par(N, -2), dp(N), comp(N);
   V.reserve(N);

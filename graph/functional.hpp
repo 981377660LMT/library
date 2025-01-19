@@ -40,6 +40,22 @@ struct FunctionalGraph {
     return {G, tree};
   }
 
+  // a -> b にかかる回数. 不可能なら infty<int>. O(1).
+  template <typename TREE>
+  int dist(TREE& tree, int a, int b) {
+    if (tree.in_subtree(a, b)) return tree.depth[a] - tree.depth[b];
+    int r = root[a];
+    int btm = TO[r];
+    // a -> r -> btm -> b
+    if (tree.in_subtree(btm, b)) {
+      int x = tree.depth[a] - tree.depth[r];
+      x += 1;
+      x += tree.depth[btm] - tree.depth[b];
+      return x;
+    }
+    return infty<int>;
+  }
+
   // functional graph に向かって進む
   template <typename TREE>
   int jump(TREE& tree, int v, ll step) {
@@ -95,10 +111,30 @@ struct FunctionalGraph {
     return tree.in_subtree(bottom, v);
   }
 
+  // 葉側から順にならんだものを出力
   vc<int> collect_cycle(int r) {
     assert(r == root[r]);
     vc<int> cyc = {TO[r]};
     while (cyc.back() != r) cyc.eb(TO[cyc.back()]);
     return cyc;
+  }
+
+  // F^k(i)==F^k(j) となる最小の k OR -1
+  template <typename TREE>
+  int meet_time(TREE& tree, int i, int j) {
+    if (i == j) return 0;
+    if (root[i] != root[j]) return -1;
+    int r = root[i];
+    int b = TO[r];
+    int n = tree.depth[b] - tree.depth[r] + 1; // cyc len
+    if ((tree.depth[i] - tree.depth[j]) % n != 0) return -1;
+
+    if (tree.depth[i] == tree.depth[j]) {
+      int lca = tree.lca(i, j);
+      return tree.depth[i] - tree.depth[lca];
+    }
+    int ti = tree.depth[i] - tree.depth[tree.lca(b, i)];
+    int tj = tree.depth[j] - tree.depth[tree.lca(b, j)];
+    return max(ti, tj);
   }
 };

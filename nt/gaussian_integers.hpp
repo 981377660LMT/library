@@ -1,15 +1,15 @@
 #include "nt/factor.hpp"
 #include "mod/mod_pow.hpp"
 
-template <typename INT>
+template <typename T>
 struct Gaussian_Integer {
-  INT x, y;
+  T x, y;
   using G = Gaussian_Integer;
 
-  Gaussian_Integer(INT x = 0, INT y = 0) : x(x), y(y) {}
-  Gaussian_Integer(pair<INT, INT> p) : x(p.fi), y(p.se) {}
+  Gaussian_Integer(T x = 0, T y = 0) : x(x), y(y) {}
+  Gaussian_Integer(pair<T, T> p) : x(p.fi), y(p.se) {}
 
-  INT norm() const { return x * x + y * y; }
+  T norm() const { return x * x + y * y; }
   G conjugate() const { return G(x, -y); }
 
   G &operator+=(const G &g) {
@@ -26,7 +26,7 @@ struct Gaussian_Integer {
   }
   G &operator/=(const G &g) {
     *this *= g.conjugate();
-    INT n = g.norm();
+    T n = g.norm();
     x = floor(x + n / 2, n);
     y = floor(y + n / 2, n);
     return *this;
@@ -52,46 +52,66 @@ struct Gaussian_Integer {
     }
     return a;
   }
+
+  G pow(ll n) const {
+    assert(n >= 0);
+    G ret(1), mul(*this);
+    while (n > 0) {
+      if (n & 1) ret *= mul;
+      mul *= mul;
+      n >>= 1;
+    }
+    return ret;
+  }
+
+  // (g,x,y) s.t ax+by=g
+  static tuple<G, G, G> extgcd(G a, G b) {
+    if (b.x != 0 || b.y != 0) {
+      G q = a / b;
+      auto [g, x, y] = extgcd(b, a - q * b);
+      return {g, y, x - q * y};
+    }
+    return {a, G{1, 0}, G{0, 0}};
+  }
 };
 
-template <typename INT>
-vc<Gaussian_Integer<INT>> solve_norm_equation_factor(vc<pair<ll, int>> pfs) {
-  using G = Gaussian_Integer<INT>;
+pair<ll, ll> solve_norm_equation_prime(ll p) {
+  using G = Gaussian_Integer<i128>;
+  assert(p == 2 || p % 4 == 1);
+  if (p == 2) return {1, 1};
+  ll x = [&]() -> ll {
+    ll x = 1;
+    while (1) {
+      ++x;
+      ll pow_x = 1;
+      if (p < (1 << 30)) {
+        pow_x = mod_pow(x, (p - 1) / 4, p);
+        if (pow_x * pow_x % p == p - 1) return pow_x;
+      } else {
+        pow_x = mod_pow_64(x, (p - 1) / 4, p);
+        if (i128(pow_x) * pow_x % p == p - 1) return pow_x;
+      }
+    }
+    return -1;
+  }();
+  G a(p, 0), b(x, 1);
+  a = G::gcd(a, b);
+  assert(a.norm() == p);
+  return {a.x, a.y};
+}
+
+template <typename T>
+vc<Gaussian_Integer<T>> solve_norm_equation_factor(vc<pair<ll, int>> pfs) {
+  using G = Gaussian_Integer<T>;
   vc<G> res;
   for (auto &&[p, e]: pfs) {
     if (p % 4 == 3 && e % 2 == 1) return {};
   }
-  auto find = [&](INT p) -> G {
-    // p は素数. ノルム p のガウス整数をひとつ見つける
-    if (p == 2) return G(1, 1);
-    // x^2 = -1 mod p をひとつ見つける
-    INT x = [&]() -> INT {
-      INT x = 1;
-      while (1) {
-        ++x;
-        INT pow_x = 1;
-        if (p < (1 << 30)) {
-          pow_x = mod_pow(x, (p - 1) / 4, p);
-          if (pow_x * pow_x % p == p - 1) return pow_x;
-        } else {
-          pow_x = mod_pow_long(x, (p - 1) / 4, p);
-          if (i128(pow_x) * pow_x % p == p - 1) return pow_x;
-        }
-      }
-      return -1;
-    }();
-    assert(x != -1);
-    // x は非剰余
-    G a(p, 0), b(x, 1);
-    a = G::gcd(a, b);
-    assert(a.norm() == p);
-    return a;
-  };
 
   res.eb(G(1, 0));
   for (auto &&[p, e]: pfs) {
     if (p % 4 == 3) {
-      INT pp = 1;
+      T pp = 1;
       FOR(e / 2) pp *= p;
       for (auto &&g: res) {
         g.x *= pp;
@@ -99,7 +119,8 @@ vc<Gaussian_Integer<INT>> solve_norm_equation_factor(vc<pair<ll, int>> pfs) {
       }
       continue;
     }
-    auto pi = find(p);
+    auto [pix, piy] = solve_norm_equation_prime(p);
+    G pi(pix, piy);
     vc<G> pows(e + 1);
     pows[0] = G(1, 0);
     FOR(i, e) pows[i + 1] = pows[i] * pi;
@@ -127,9 +148,9 @@ vc<Gaussian_Integer<INT>> solve_norm_equation_factor(vc<pair<ll, int>> pfs) {
 // ノルムがとれるように、2 乗してもオーバーフローしない型を使おう
 // 0 <= arg < 90 となるもののみ返す。
 // 単数倍は作らないので、使うときに気を付ける。
-template <typename INT>
-vc<Gaussian_Integer<INT>> solve_norm_equation(INT N) {
-  using G = Gaussian_Integer<INT>;
+template <typename T>
+vc<Gaussian_Integer<T>> solve_norm_equation(T N) {
+  using G = Gaussian_Integer<T>;
   vc<G> res;
   if (N < 0) return {};
   if (N == 0) {
@@ -137,5 +158,5 @@ vc<Gaussian_Integer<INT>> solve_norm_equation(INT N) {
     return res;
   }
   auto pfs = factor(N);
-  return solve_norm_equation_factor<INT>(pfs);
+  return solve_norm_equation_factor<T>(pfs);
 }

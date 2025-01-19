@@ -1,6 +1,10 @@
 #include "ds/hashmap.hpp"
 #include "random/hash_vector.hpp"
 
+// dot case:
+// https://atcoder.jp/contests/ttpc2023/submissions/57905985
+// https://qoj.ac/problem/9
+
 namespace connected_dp_squares {
 // pair<新しい状態、今の成分 → 新しい成分>
 vc<pair<vc<int>, vc<int>>> next_states(const vc<int>& now) {
@@ -25,8 +29,7 @@ vc<pair<vc<int>, vc<int>>> next_states(const vc<int>& now) {
     FOR(i, N) if (par[i] != -1 && par[N + i] != -1) merge(i, N + i);
     FOR(i, N + N) if (par[i] != -1) par[i] = find(i);
     FOR(i, N, N + N) if (par[i] >= N) par[i] = -1;
-    res.eb(vc<int>(par.begin(), par.begin() + N),
-           vc<int>(par.begin() + N, par.end()));
+    res.eb(vc<int>(par.begin(), par.begin() + N), vc<int>(par.begin() + N, par.end()));
   }
   return res;
 }
@@ -48,10 +51,8 @@ vc<int> reverse_state(const vc<int>& now) {
 // 連結領域をひとつ作る。
 // 状態：-1 が選んでいない。0,1,2,3 等は同じ成分には同じ値が入る。
 // [states, edges]
-pair<vvc<int>, vc<pair<int, int>>> connedted_dp_graph(int N,
-                                                      bool merge_reverse) {
-  static HashMap<int> MP;
-  MP.reset();
+pair<vvc<int>, vc<pair<int, int>>> connedted_dp_graph(int N, bool merge_reverse) {
+  HashMap<int> MP;
   vvc<int> states;
   vc<pair<int, int>> edges;
 
@@ -81,12 +82,9 @@ pair<vvc<int>, vc<pair<int, int>>> connedted_dp_graph(int N,
         edges.eb(p, 1);
         continue;
       }
-      ll h = hash_vector<int>(nxt);
+      u64 h = hash_vector<int>(nxt);
       if (merge_reverse) { chmin(h, hash_vector<int>(reverse_state(nxt))); }
-      if (!MP.count(h)) {
-        MP[h] = len(states);
-        states.eb(nxt);
-      }
+      if (!MP.count(h)) { MP[h] = len(states), states.eb(nxt); }
       edges.eb(p, MP[h]);
     }
   }
@@ -98,8 +96,7 @@ pair<vvc<int>, vc<pair<int, int>>> connedted_dp_graph(int N,
 // 状態：-1 が選んでいない。0,1,2,3 等は同じ成分には同じ値が入る。
 // [states, edges]
 pair<vvc<int>, vc<pair<int, int>>> polygon_dp_graph(int N) {
-  static HashMap<int> MP;
-  MP.reset();
+  HashMap<int> MP;
   vvc<int> states;
   vc<pair<int, int>> edges;
 
@@ -155,7 +152,7 @@ pair<vvc<int>, vc<pair<int, int>>> polygon_dp_graph(int N) {
         return a - close == after;
       }(now, nxt, convert);
       if (!ok) continue;
-      ll h = hash_vector<int>(nxt);
+      u64 h = hash_vector<int>(nxt);
       if (!MP.count(h)) {
         MP[h] = len(states);
         states.eb(nxt);
@@ -165,5 +162,4 @@ pair<vvc<int>, vc<pair<int, int>>> polygon_dp_graph(int N) {
   }
   return {states, edges};
 }
-
 } // namespace connected_dp_squares

@@ -1,83 +1,78 @@
-#include "alg/monoid/add.hpp"
 
+// sigma が小さい
+// 一般の n 頂点の木構造で O(n) 時間で動く
+// https://atcoder.jp/contests/xmascontest2015noon/tasks/xmascontest2015_d
 template <int sigma>
 struct Trie {
-  using ARR = array<int, sigma>;
+  struct Node {
+    array<int, sigma> ch;
+    array<int, sigma> nxt; // suffix link -> add c
+    int parent;
+    int suffix_link;
+  };
   int n_node;
-  vc<ARR> TO;
-  vc<int> parent;
-  vc<int> suffix_link;
+  vc<Node> nodes;
   vc<int> words;
-  vc<int> V; // BFS 順
+  vc<int> BFS; // BFS 順
 
   Trie() {
     n_node = 0;
     new_node();
   }
 
+  Node& operator[](int i) { return nodes[i]; }
+
   template <typename STRING>
   int add(STRING S, int off) {
     int v = 0;
-    for (auto&& ss: S) {
-      int s = ss - off;
-      assert(0 <= s && s < sigma);
-      if (TO[v][s] == -1) {
-        TO[v][s] = new_node();
-        parent.back() = v;
-      }
-      v = TO[v][s];
-    }
+    for (auto&& s: S) { v = add_single(v, s, off); }
     words.eb(v);
     return v;
   }
 
-  int add_char(int v, int c, int off) {
+  int add_single(int v, int c, int off) {
     c -= off;
-    if (TO[v][c] != -1) return TO[v][c];
-    TO[v][c] = new_node();
-    parent.back() = v;
-    return TO[v][c];
+    assert(0 <= c && c < sigma);
+    if (nodes[v].ch[c] != -1) return nodes[v].ch[c];
+    nodes[v].ch[c] = new_node();
+    nodes.back().parent = v;
+    return nodes[v].ch[c];
   }
 
-  void calc_suffix_link(bool upd_TO) {
-    suffix_link.assign(n_node, -1);
-    V.resize(n_node);
+  void calc_suffix_link() {
+    BFS.resize(n_node);
     int p = 0, q = 0;
-    V[q++] = 0;
+    BFS[q++] = 0;
+    fill(all(nodes[0].nxt), 0);
     while (p < q) {
-      int v = V[p++];
+      int v = BFS[p++];
+      if (v) nodes[v].nxt = nodes[nodes[v].suffix_link].nxt;
       FOR(s, sigma) {
-        int w = TO[v][s];
+        int w = nodes[v].ch[s];
         if (w == -1) continue;
-        V[q++] = w;
-        int f = suffix_link[v];
-        while (f != -1 && TO[f][s] == -1) f = suffix_link[f];
-        suffix_link[w] = (f == -1 ? 0 : TO[f][s]);
-      }
-    }
-    if (!upd_TO) return;
-    for (auto&& v: V) {
-      FOR(s, sigma) if (TO[v][s] == -1) {
-        int f = suffix_link[v];
-        TO[v][s] = (f == -1 ? 0 : TO[f][s]);
+        nodes[w].suffix_link = nodes[v].nxt[s];
+        nodes[v].nxt[s] = w;
+        BFS[q++] = w;
       }
     }
   }
 
   vc<int> calc_count() {
-    assert(!suffix_link.empty());
     vc<int> count(n_node);
     for (auto&& x: words) count[x]++;
-    for (auto&& v: V)
-      if (v) { count[v] += count[suffix_link[v]]; }
+    for (auto&& v: BFS)
+      if (v) { count[v] += count[nodes[v].suffix_link]; }
     return count;
   }
 
 private:
   int new_node() {
-    parent.eb(-1);
-    TO.eb(ARR{});
-    fill(all(TO.back()), -1);
+    Node c;
+    fill(all(c.ch), -1);
+    fill(all(c.nxt), -1);
+    c.parent = -1;
+    c.suffix_link = -1;
+    nodes.eb(c);
     return n_node++;
   }
 };

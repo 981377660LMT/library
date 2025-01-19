@@ -1,6 +1,7 @@
 #pragma once
 
-template <typename ActedMonoid, bool PERSISTENT, int NODES>
+// Q*4logN 程度必要? apply で 4logN ノード作っていると思う
+template <typename ActedMonoid, bool PERSISTENT>
 struct Dynamic_Lazy_SegTree {
   using AM = ActedMonoid;
   using MX = typename AM::Monoid_X;
@@ -16,27 +17,33 @@ struct Dynamic_Lazy_SegTree {
     A lazy;
   };
 
+  const int NODES;
   const ll L0, R0;
   Node *pool;
   int pid;
   using np = Node *;
 
   Dynamic_Lazy_SegTree(
-      ll L0, ll R0, F default_prod = [](ll l, ll r) -> X { return MX::unit(); })
-      : default_prod(default_prod), L0(L0), R0(R0), pid(0) {
+      int NODES, ll L0, ll R0, F default_prod = [](ll, ll) -> X { return MX::unit(); })
+      : default_prod(default_prod), NODES(NODES), L0(L0), R0(R0), pid(0) {
     pool = new Node[NODES];
   }
+  ~Dynamic_Lazy_SegTree() { delete[] pool; }
 
   np new_root() { return new_node(L0, R0); }
 
   np new_node(const X x) {
+    assert(pid < NODES);
     pool[pid].l = pool[pid].r = nullptr;
     pool[pid].x = x;
     pool[pid].lazy = MA::unit();
     return &(pool[pid++]);
   }
 
-  np new_node(ll l, ll r) { return new_node(default_prod(l, r)); }
+  np new_node(ll l, ll r) {
+    assert(l < r);
+    return new_node(default_prod(l, r));
+  }
   np new_node() { return new_node(L0, R0); }
 
   np new_node(const vc<X> &dat) {
@@ -113,6 +120,14 @@ struct Dynamic_Lazy_SegTree {
 
   void reset() { pid = 0; }
 
+  // root[l:r) を apply(other[l:r),a) で上書きしたものを返す
+  np copy_interval(np root, np other, ll l, ll r, A a) {
+    if (root == other) return root;
+    root = copy_node(root);
+    copy_interval_rec(root, other, L0, R0, l, r, a);
+    return root;
+  }
+
 private:
   np copy_node(np c) {
     if (!c || !PERSISTENT) return c;
@@ -133,6 +148,38 @@ private:
     c->r->x = AM::act(c->r->x, c->lazy, r - m);
     c->r->lazy = MA::op(c->r->lazy, c->lazy);
     c->lazy = MA::unit();
+  }
+
+  void copy_interval_rec(np c, np d, ll l, ll r, ll ql, ll qr, A a) {
+    // c[ql,qr) <- apply(d[ql,qr),a)
+    // もう c は新しくしてある
+    assert(c);
+    chmax(ql, l), chmin(qr, r);
+    if (ql >= qr) return;
+    if (l == ql && r == qr) {
+      if (d) {
+        c->x = AM::act(d->x, a, r - l), c->lazy = MA::op(d->lazy, a);
+        c->l = d->l, c->r = d->r;
+      } else {
+        c->x = AM::act(default_prod(l, r), a, r - l), c->lazy = a;
+        c->l = nullptr, c->r = nullptr;
+      }
+      return;
+    }
+    // push
+    ll m = (l + r) / 2;
+    c->l = (c->l ? copy_node(c->l) : new_node());
+    c->r = (c->r ? copy_node(c->r) : new_node());
+    c->l->x = AM::act(c->l->x, c->lazy, m - l);
+    c->l->lazy = MA::op(c->l->lazy, c->lazy);
+    c->r->x = AM::act(c->r->x, c->lazy, r - m);
+    c->r->lazy = MA::op(c->r->lazy, c->lazy);
+    c->lazy = MA::unit();
+    if (d) a = MA::op(d->lazy, a);
+    copy_interval_rec(c->l, (d && d->l ? d->l : nullptr), l, m, ql, qr, a);
+    copy_interval_rec(c->r, (d && d->r ? d->r : nullptr), m, r, ql, qr, a);
+    c->x = MX::op(c->l->x, c->r->x);
+    return;
   }
 
   np set_rec(np c, ll l, ll r, ll i, const X &x) {

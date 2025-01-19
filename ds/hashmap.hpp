@@ -1,56 +1,74 @@
 #pragma once
-#include "random/base.hpp"
 
 // u64 -> Val
-template <typename Val, int LOG = 20>
+template <typename Val>
 struct HashMap {
-  int N;
-  u64* keys;
-  Val* vals;
-  vc<int> IDS;
-  bitset<1 << LOG> used;
-  const int shift;
-  const u64 r = 11995408973635179863ULL;
-  HashMap()
-      : N(1 << LOG), keys(new u64[N]), vals(new Val[N]), shift(64 - __lg(N)) {}
-  int hash(ll x) {
-    static const u64 FIXED_RANDOM
-        = std::chrono::steady_clock::now().time_since_epoch().count();
-    return (u64(x + FIXED_RANDOM) * r) >> shift;
+  // n は入れたいものの個数で ok
+  HashMap(u32 n = 0) { build(n); }
+  void build(u32 n) {
+    u32 k = 8;
+    while (k < n * 2) k *= 2;
+    cap = k / 2, mask = k - 1;
+    key.resize(k), val.resize(k), used.assign(k, 0);
   }
 
-  int index(const u64& key) {
+  // size を保ったまま. size=0 にするときは build すること.
+  void clear() {
+    used.assign(len(used), 0);
+    cap = (mask + 1) / 2;
+  }
+  int size() { return len(used) / 2 - cap; }
+
+  int index(const u64& k) {
     int i = 0;
-    for (i = hash(key); used[i] && keys[i] != key; (i += 1) &= (N - 1)) {}
+    for (i = hash(k); used[i] && key[i] != k; i = (i + 1) & mask) {}
     return i;
   }
 
-  // [] した時点で要素は作られる
-  Val& operator[](const u64& key) {
-    int i = index(key);
-    if (!used[i]) IDS.eb(i), used[i] = 1, keys[i] = key, vals[i] = Val{};
-    return vals[i];
+  Val& operator[](const u64& k) {
+    if (cap == 0) extend();
+    int i = index(k);
+    if (!used[i]) { used[i] = 1, key[i] = k, val[i] = Val{}, --cap; }
+    return val[i];
   }
 
-  Val get(const u64& key, Val default_value) {
-    int i = index(key);
-    if (!used[i]) return default_value;
-    return vals[i];
+  Val get(const u64& k, Val default_value) {
+    int i = index(k);
+    return (used[i] ? val[i] : default_value);
   }
 
-  bool count(const u64& key) {
-    int i = index(key);
-    return used[i] && keys[i] == key;
-  }
-
-  void reset() {
-    for (auto&& i: IDS) used[i] = 0;
-    IDS.clear();
+  bool count(const u64& k) {
+    int i = index(k);
+    return used[i] && key[i] == k;
   }
 
   // f(key, val)
   template <typename F>
   void enumerate_all(F f) {
-    for (auto&& i: IDS) f(keys[i], vals[i]);
+    FOR(i, len(used)) if (used[i]) f(key[i], val[i]);
+  }
+
+private:
+  u32 cap, mask;
+  vc<u64> key;
+  vc<Val> val;
+  vc<bool> used;
+
+  u64 hash(u64 x) {
+    static const u64 FIXED_RANDOM = std::chrono::steady_clock::now().time_since_epoch().count();
+    x += FIXED_RANDOM;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111eb;
+    return (x ^ (x >> 31)) & mask;
+  }
+
+  void extend() {
+    vc<pair<u64, Val>> dat;
+    dat.reserve(len(used) / 2 - cap);
+    FOR(i, len(used)) {
+      if (used[i]) dat.eb(key[i], val[i]);
+    }
+    build(2 * len(dat));
+    for (auto& [a, b]: dat) (*this)[a] = b;
   }
 };

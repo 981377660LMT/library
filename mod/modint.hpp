@@ -3,30 +3,40 @@
 
 template <int mod>
 struct modint {
-  static_assert(mod < (1 << 30));
-  int val;
-  constexpr modint(const ll val = 0) noexcept
-      : val(val >= 0 ? val % mod : (mod - (-val) % mod) % mod) {}
-  bool operator<(const modint &other) const {
-    return val < other.val;
-  } // To use std::map
+  static constexpr u32 umod = u32(mod);
+  static_assert(umod < u32(1) << 31);
+  u32 val;
+
+  static modint raw(u32 v) {
+    modint x;
+    x.val = v;
+    return x;
+  }
+  constexpr modint() : val(0) {}
+  constexpr modint(u32 x) : val(x % umod) {}
+  constexpr modint(u64 x) : val(x % umod) {}
+  constexpr modint(u128 x) : val(x % umod) {}
+  constexpr modint(int x) : val((x %= mod) < 0 ? x + mod : x){};
+  constexpr modint(ll x) : val((x %= mod) < 0 ? x + mod : x){};
+  constexpr modint(i128 x) : val((x %= mod) < 0 ? x + mod : x){};
+  bool operator<(const modint &other) const { return val < other.val; }
   modint &operator+=(const modint &p) {
-    if ((val += p.val) >= mod) val -= mod;
+    if ((val += p.val) >= umod) val -= umod;
     return *this;
   }
   modint &operator-=(const modint &p) {
-    if ((val += mod - p.val) >= mod) val -= mod;
+    if ((val += umod - p.val) >= umod) val -= umod;
     return *this;
   }
   modint &operator*=(const modint &p) {
-    val = (int)(1LL * val * p.val % mod);
+    val = u64(val) * p.val % umod;
     return *this;
   }
   modint &operator/=(const modint &p) {
     *this *= p.inverse();
     return *this;
   }
-  modint operator-() const { return modint(-val); }
+  modint operator-() const { return modint::raw(val ? mod - val : u32(0)); }
   modint operator+(const modint &p) const { return modint(*this) += p; }
   modint operator-(const modint &p) const { return modint(*this) -= p; }
   modint operator*(const modint &p) const { return modint(*this) *= p; }
@@ -51,28 +61,35 @@ struct modint {
     }
     return ret;
   }
-#ifdef FASTIO
-  void write() { fastio::printer.write(val); }
-  void read() {
-    fastio::scanner.read(val);
-    val = (val >= 0 ? val % mod : (mod - (-val) % mod) % mod);
-  }
-#endif
   static constexpr int get_mod() { return mod; }
   // (n, r), r は 1 の 2^n 乗根
   static constexpr pair<int, int> ntt_info() {
+    if (mod == 120586241) return {20, 74066978};
     if (mod == 167772161) return {25, 17};
     if (mod == 469762049) return {26, 30};
     if (mod == 754974721) return {24, 362};
     if (mod == 880803841) return {23, 211};
+    if (mod == 943718401) return {22, 663003469};
     if (mod == 998244353) return {23, 31};
-    if (mod == 1045430273) return {20, 363};
-    if (mod == 1051721729) return {20, 330};
-    if (mod == 1053818881) return {20, 2789};
+    if (mod == 1004535809) return {21, 582313106};
+    if (mod == 1012924417) return {21, 368093570};
     return {-1, -1};
   }
   static constexpr bool can_ntt() { return ntt_info().fi != -1; }
 };
+
+#ifdef FASTIO
+template <int mod>
+void rd(modint<mod> &x) {
+  fastio::rd(x.val);
+  x.val %= mod;
+  // assert(0 <= x.val && x.val < mod);
+}
+template <int mod>
+void wt(modint<mod> x) {
+  fastio::wt(x.val);
+}
+#endif
 
 using modint107 = modint<1000000007>;
 using modint998 = modint<998244353>;

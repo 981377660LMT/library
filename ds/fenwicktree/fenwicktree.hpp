@@ -4,6 +4,7 @@
 template <typename Monoid>
 struct FenwickTree {
   using G = Monoid;
+  using MX = Monoid;
   using E = typename G::value_type;
   int n;
   vector<E> dat;
@@ -61,31 +62,102 @@ struct FenwickTree {
     return G::op(pos, G::inverse(neg));
   }
 
+  vc<E> get_all() {
+    vc<E> res(n);
+    FOR(i, n) res[i] = prod(i, i + 1);
+    return res;
+  }
+
   void add(int k, E x) { multiply(k, x); }
   void multiply(int k, E x) {
     static_assert(G::commute);
     total = G::op(total, x);
     for (++k; k <= n; k += k & -k) dat[k - 1] = G::op(dat[k - 1], x);
   }
+  void set(int k, E x) { add(k, G::op(G::inverse(prod(k, k + 1)), x)); }
 
   template <class F>
-  int max_right(const F check) {
+  int max_right(const F check, int L = 0) {
     assert(check(G::unit()));
-    int i = 0;
     E s = G::unit();
-    int k = 1;
-    while (2 * k <= n) k *= 2;
-    while (k) {
-      if (i + k - 1 < len(dat)) {
-        E t = G::op(s, dat[i + k - 1]);
-        if (check(t)) { i += k, s = t; }
+    int i = L;
+    // 2^k 進むとダメ
+    int k = [&]() {
+      while (1) {
+        if (i % 2 == 1) { s = G::op(s, G::inverse(dat[i - 1])), i -= 1; }
+        if (i == 0) { return topbit(n) + 1; }
+        int k = lowbit(i) - 1;
+        if (i + (1 << k) > n) return k;
+        E t = G::op(s, dat[i + (1 << k) - 1]);
+        if (!check(t)) { return k; }
+        s = G::op(s, G::inverse(dat[i - 1])), i -= i & -i;
       }
-      k >>= 1;
+    }();
+    while (k) {
+      --k;
+      if (i + (1 << k) - 1 < len(dat)) {
+        E t = G::op(s, dat[i + (1 << k) - 1]);
+        if (check(t)) { i += (1 << k), s = t; }
+      }
     }
     return i;
   }
 
-  int kth(E k) {
-    return max_right([&k](E x) -> bool { return x <= k; });
+  // check(i, x)
+  template <class F>
+  int max_right_with_index(const F check, int L = 0) {
+    assert(check(L, G::unit()));
+    E s = G::unit();
+    int i = L;
+    // 2^k 進むとダメ
+    int k = [&]() {
+      while (1) {
+        if (i % 2 == 1) { s = G::op(s, G::inverse(dat[i - 1])), i -= 1; }
+        if (i == 0) { return topbit(n) + 1; }
+        int k = lowbit(i) - 1;
+        if (i + (1 << k) > n) return k;
+        E t = G::op(s, dat[i + (1 << k) - 1]);
+        if (!check(i + (1 << k), t)) { return k; }
+        s = G::op(s, G::inverse(dat[i - 1])), i -= i & -i;
+      }
+    }();
+    while (k) {
+      --k;
+      if (i + (1 << k) - 1 < len(dat)) {
+        E t = G::op(s, dat[i + (1 << k) - 1]);
+        if (check(i + (1 << k), t)) { i += (1 << k), s = t; }
+      }
+    }
+    return i;
+  }
+
+  template <class F>
+  int min_left(const F check, int R) {
+    assert(check(G::unit()));
+    E s = G::unit();
+    int i = R;
+    // false になるところまで戻る
+    int k = 0;
+    while (i > 0 && check(s)) {
+      s = G::op(s, dat[i - 1]);
+      k = lowbit(i);
+      i -= i & -i;
+    }
+    if (check(s)) {
+      assert(i == 0);
+      return 0;
+    }
+    // 2^k 進むと ok になる
+    // false を維持して進む
+    while (k) {
+      --k;
+      E t = G::op(s, G::inverse(dat[i + (1 << k) - 1]));
+      if (!check(t)) { i += (1 << k), s = t; }
+    }
+    return i + 1;
+  }
+
+  int kth(E k, int L = 0) {
+    return max_right([&k](E x) -> bool { return x <= k; }, L);
   }
 };

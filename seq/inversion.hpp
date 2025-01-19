@@ -1,20 +1,16 @@
 #pragma once
-#include "ds/fenwicktree/fenwicktree.hpp"
+#include "ds/fenwicktree/fenwicktree_01.hpp"
 
-template <typename T, bool SMALL = false>
+template <typename T>
 ll inversion(vc<T> A) {
+  int N = len(A);
   if (A.empty()) return 0;
-  if (!SMALL) {
-    auto key = A;
-    UNIQUE(key);
-    for (auto&& x: A) x = LB(key, x);
-  }
   ll ANS = 0;
-  ll K = MAX(A) + 1;
-  FenwickTree<Monoid_Add<int>> bit(K);
-  for (auto&& x: A) {
-    ANS += bit.sum(x + 1, K);
-    bit.add(x, 1);
+  FenwickTree_01 bit(N);
+  auto I = argsort(A);
+  for (auto& i: I) {
+    ANS += bit.sum_all() - bit.sum(i);
+    bit.add(i, 1);
   }
   return ANS;
 }
@@ -54,4 +50,18 @@ vvc<int> all_range_inversion(vc<T>& A) {
     if (A[L] > A[R - 1]) ++dp[L][R];
   }
   return dp;
+}
+
+template <typename T>
+ll inversion_between(vc<T> A, vc<T> B) {
+  int N = len(A);
+  map<T, vc<int>> MP;
+  FOR(i, N) MP[B[i]].eb(i);
+  vc<int> TO(N);
+  FOR_R(i, N) {
+    auto& I = MP[A[i]];
+    if (I.empty()) return -1;
+    TO[i] = POP(I);
+  }
+  return inversion(TO);
 }

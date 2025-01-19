@@ -1,21 +1,43 @@
 #pragma once
+
+/*
+update でちゃんと prod が計算されてくれれば prod は op(lprod,x,rprod) でなくてもよい.
+*/
+
 // Node 型を別に定義して使う
-template <typename Node, int NODES = 1'000'000>
+template <typename Node>
 struct SplayTree {
   Node *pool;
+  const int NODES;
   int pid;
   using np = Node *;
   using X = typename Node::value_type;
   using A = typename Node::operator_type;
+  vc<np> FREE;
 
-  SplayTree() : pid(0) { pool = new Node[NODES]; }
+  SplayTree(int NODES) : NODES(NODES), pid(0) { pool = new Node[NODES]; }
+  ~SplayTree() { delete[] pool; }
 
-  void reset() { pid = 0; }
+  void free_subtree(np c) {
+    if (!c) return;
+    auto dfs = [&](auto &dfs, np c) -> void {
+      if (c->l) dfs(dfs, c->l);
+      if (c->r) dfs(dfs, c->r);
+      FREE.eb(c);
+    };
+    dfs(dfs, c);
+  }
+
+  void reset() {
+    pid = 0;
+    FREE.clear();
+  }
 
   np new_root() { return nullptr; }
 
   np new_node(const X &x) {
-    np n = &(pool[pid++]);
+    assert(!FREE.empty() || pid < NODES);
+    np n = (FREE.empty() ? &(pool[pid++]) : POP(FREE));
     Node::new_node(n, x);
     return n;
   }
@@ -42,6 +64,7 @@ struct SplayTree {
   np merge(np l_root, np r_root) {
     if (!l_root) return r_root;
     if (!r_root) return l_root;
+    assert((!l_root->p) && (!r_root->p));
     splay_kth(r_root, 0); // splay したので prop 済
     r_root->l = l_root;
     l_root->p = r_root;
@@ -52,8 +75,9 @@ struct SplayTree {
   np merge4(np a, np b, np c, np d) { return merge(merge(merge(a, b), c), d); }
 
   pair<np, np> split(np root, u32 k) {
-    if (k == (root->size)) return {root, nullptr};
+    assert(!root || !root->p);
     if (k == 0) return {nullptr, root};
+    if (k == (root->size)) return {root, nullptr};
     splay_kth(root, k - 1);
     np right = root->r;
     root->r = nullptr, right->p = nullptr;
@@ -71,6 +95,11 @@ struct SplayTree {
     tie(root, d) = split(root, k);
     auto [a, b, c] = split3(root, i, j);
     return {a, b, c, d};
+  }
+
+  tuple<np, np, np> split_L_root_R(np root) {
+    u32 s = (root->l ? root->l->size : 0);
+    return split3(root, s, s + 1);
   }
 
   // 部分木が区間 [l,r) に対応するようなノードを作って返す
@@ -113,31 +142,36 @@ struct SplayTree {
   }
 
   X get(np &root, u32 k) {
+    assert(root == nullptr || !root->p);
     splay_kth(root, k);
     return root->get();
   }
 
   void set(np &root, u32 k, const X &x) {
+    assert(root != nullptr && !root->p);
     splay_kth(root, k);
     root->set(x);
   }
 
   void multiply(np &root, u32 k, const X &x) {
+    assert(root != nullptr && !root->p);
     splay_kth(root, k);
     root->multiply(x);
   }
 
   X prod(np &root, u32 l, u32 r) {
+    assert(root == nullptr || !root->p);
     using Mono = typename Node::Monoid_X;
     if (l == r) return Mono::unit();
     assert(0 <= l && l < r && r <= root->size);
     goto_between(root, l, r);
     X res = root->prod;
-    splay(root);
+    splay(root, true);
     return res;
   }
 
   X prod(np &root) {
+    assert(root == nullptr || !root->p);
     using Mono = typename Node::Monoid_X;
     return (root ? root->prod : Mono::unit());
   }
@@ -147,7 +181,7 @@ struct SplayTree {
     assert(0 <= l && l < r && r <= root->size);
     goto_between(root, l, r);
     root->apply(a);
-    splay(root);
+    splay(root, true);
   }
   void apply(np &root, const A &a) {
     if (!root) return;
@@ -155,11 +189,12 @@ struct SplayTree {
   }
 
   void reverse(np &root, u32 l, u32 r) {
+    assert(root == nullptr || !root->p);
     if (l == r) return;
     assert(0 <= l && l < r && r <= root->size);
     goto_between(root, l, r);
     root->reverse();
-    splay(root);
+    splay(root, true);
   }
   void reverse(np root) {
     if (!root) return;
@@ -187,9 +222,19 @@ struct SplayTree {
     if (c) c->p = p;
   }
 
-  void splay(Node *me) {
+  void prop_from_root(np c) {
+    if (!c->p) {
+      c->prop();
+      return;
+    }
+    prop_from_root(c->p);
+    c->prop();
+  }
+
+  void splay(Node *me, bool prop_from_root_done) {
     // これを呼ぶ時点で、me の祖先（me を除く）は既に prop 済であることを仮定
     // 特に、splay 終了時点で me は upd / prop 済である
+    if (!prop_from_root_done) prop_from_root(me);
     me->prop();
     while (me->p) {
       np p = me->p;
@@ -211,9 +256,9 @@ struct SplayTree {
   void splay_kth(np &root, u32 k) {
     assert(0 <= k && k < (root->size));
     while (1) {
+      root->prop();
       u32 sl = (root->l ? root->l->size : 0);
       if (k == sl) break;
-      root->prop();
       if (k < sl)
         root = root->l;
       else {
@@ -221,19 +266,39 @@ struct SplayTree {
         root = root->r;
       }
     }
-    splay(root);
+    splay(root, true);
   }
 
   // check(x), 左側のノード全体が check を満たすように切る
   template <typename F>
   pair<np, np> split_max_right(np root, F check) {
     if (!root) return {nullptr, nullptr};
+    assert(!root->p);
     np c = find_max_right(root, check);
     if (!c) {
-      splay(root);
+      splay(root, true);
       return {nullptr, root};
     }
-    splay(c);
+    splay(c, true);
+    np right = c->r;
+    if (!right) return {c, nullptr};
+    right->p = nullptr;
+    c->r = nullptr;
+    c->update();
+    return {c, right};
+  }
+
+  // check(x, cnt), 左側のノード全体が check を満たすように切る
+  template <typename F>
+  pair<np, np> split_max_right_cnt(np root, F check) {
+    if (!root) return {nullptr, nullptr};
+    assert(!root->p);
+    np c = find_max_right_cnt(root, check);
+    if (!c) {
+      splay(root, true);
+      return {nullptr, root};
+    }
+    splay(c, true);
     np right = c->r;
     if (!right) return {c, nullptr};
     right->p = nullptr;
@@ -246,12 +311,13 @@ struct SplayTree {
   template <typename F>
   pair<np, np> split_max_right_prod(np root, F check) {
     if (!root) return {nullptr, nullptr};
+    assert(!root->p);
     np c = find_max_right_prod(root, check);
     if (!c) {
-      splay(root);
+      splay(root, true);
       return {nullptr, root};
     }
-    splay(c);
+    splay(c, true);
     np right = c->r;
     if (!right) return {c, nullptr};
     right->p = nullptr;
@@ -274,7 +340,28 @@ struct SplayTree {
         root = root->l;
       }
     }
-    splay(last);
+    splay(last, true);
+    return last_ok;
+  }
+
+  template <typename F>
+  np find_max_right_cnt(np root, const F &check) {
+    // 最後に見つけた ok の点、最後に探索した点
+    np last_ok = nullptr, last = nullptr;
+    ll n = 0;
+    while (root) {
+      last = root;
+      root->prop();
+      ll ns = (root->l ? root->l->size : 0);
+      if (check(root->x, n + ns + 1)) {
+        last_ok = root;
+        n += ns + 1;
+        root = root->r;
+      } else {
+        root = root->l;
+      }
+    }
+    splay(last, true);
     return last_ok;
   }
 
@@ -287,9 +374,12 @@ struct SplayTree {
     while (root) {
       last = root;
       root->prop();
-      X lprod = prod;
-      if (root->l) lprod = Mono::op(lprod, root->l->prod);
-      lprod = Mono::op(lprod, root->x);
+      np tmp = root->r;
+      root->r = nullptr;
+      root->update();
+      X lprod = Mono::op(prod, root->prod);
+      root->r = tmp;
+      root->update();
       if (check(lprod)) {
         prod = lprod;
         last_ok = root;
@@ -298,7 +388,7 @@ struct SplayTree {
         root = root->l;
       }
     }
-    splay(last);
+    splay(last, true);
     return last_ok;
   }
 };

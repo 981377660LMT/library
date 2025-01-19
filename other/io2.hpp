@@ -1,16 +1,16 @@
-#define INT(...) \
+#define INT(...)   \
   int __VA_ARGS__; \
   IN(__VA_ARGS__)
-#define LL(...) \
+#define LL(...)   \
   ll __VA_ARGS__; \
   IN(__VA_ARGS__)
-#define STR(...) \
+#define STR(...)      \
   string __VA_ARGS__; \
   IN(__VA_ARGS__)
-#define CHR(...) \
+#define CHR(...)    \
   char __VA_ARGS__; \
   IN(__VA_ARGS__)
-#define DBL(...) \
+#define DBL(...)           \
   long double __VA_ARGS__; \
   IN(__VA_ARGS__)
 
@@ -27,29 +27,46 @@ void read(char &a) { cin >> a; }
 void read(double &a) { cin >> a; }
 void read(long double &a) { cin >> a; }
 void read(string &a) { cin >> a; }
-template <class T, class S> void read(pair<T, S> &p) { read(p.first), read(p.second); }
-template <class T> void read(vector<T> &a) {for(auto &i : a) read(i);}
-template <class T> void read(T &a) { cin >> a; }
+template <class T, class S>
+void read(pair<T, S> &p) {
+  read(p.first), read(p.second);
+}
+template <class T>
+void read(vector<T> &a) {
+  for (auto &i: a) read(i);
+}
+template <class T>
+void read(T &a) {
+  cin >> a;
+}
 void IN() {}
-template <class Head, class... Tail> void IN(Head &head, Tail &...tail) {
+template <class Head, class... Tail>
+void IN(Head &head, Tail &... tail) {
   read(head);
   IN(tail...);
 }
 
 template <typename T, typename U>
-ostream& operator<<(ostream& os, const pair<T, U>& A) {
+ostream &operator<<(ostream &os, const pair<T, U> &A) {
   os << A.fi << " " << A.se;
   return os;
 }
 
 template <typename T>
-ostream& operator<<(ostream& os, const vector<T>& A) {
+ostream &operator<<(ostream &os, const vector<T> &A) {
   for (size_t i = 0; i < A.size(); i++) {
-    if(i) os << " ";
+    if (i) os << " ";
     os << A[i];
   }
   return os;
 }
+
+// chatgpt helped me
+class CoutInitializer {
+public:
+  CoutInitializer() { std::cout << std::fixed << std::setprecision(15); }
+};
+static CoutInitializer cout_initializer;
 
 void print() {
   cout << "\n";
@@ -57,7 +74,7 @@ void print() {
 }
 
 template <class Head, class... Tail>
-void print(Head&& head, Tail&&... tail) {
+void print(Head &&head, Tail &&... tail) {
   cout << head;
   if (sizeof...(Tail)) cout << " ";
   print(forward<Tail>(tail)...);

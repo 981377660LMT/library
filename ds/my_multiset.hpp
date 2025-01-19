@@ -1,116 +1,44 @@
-template <typename VAL, typename SM>
+
+#include "ds/segtree/dynamic_segtree_sparse.hpp"
+
+// key,cnt は long long, sum は i128
 struct My_Multiset {
-  using T = VAL;
-  int sz;
-  SM sm_all;
-  vvc<T> dat;
-  vc<SM> sm;
-  static const int BUCKET_RATIO = 50, REBUILD_RATIO = 170;
+  struct Mono {
+    using value_type = pair<ll, i128>; // cnt, sum
+    using X = value_type;
+    static X op(X x, X y) { return {x.fi + y.fi, x.se + y.se}; }
+    static constexpr X unit() { return {0, 0}; }
+    static constexpr bool commute = 1;
+  };
+  Dynamic_SegTree_Sparse<Mono, false> seg;
+  using np = typename decltype(seg)::np;
 
-  My_Multiset() : sz(0), sm_all(0), dat(1), sm(1) {}
+  My_Multiset(int NODES) : seg(NODES, -infty<ll>, infty<ll>) {}
 
-  void build(vc<T> vals) {
-    sort(all(vals));
-    sz = len(vals);
-    int b_cnt = sqrt(sz / BUCKET_RATIO) + 1;
-    dat.resize(b_cnt);
-    FOR(i, b_cnt) {
-      int l = sz * i / b_cnt, r = sz * (i + 1) / b_cnt;
-      dat[i] = {vals.begin() + l, vals.begin() + r};
-    }
-    sm.resize(b_cnt);
-    FOR(i, b_cnt) sm[i] = SUM<SM>(dat[i]);
-    sm_all = SUM<SM>(sm);
+  void reset() { seg.reset(); }
+  np new_root() { return seg.new_root(); }
+  np add(np c, ll k, ll cnt = 1) { return seg.multiply(c, k, {cnt, i128(k) * cnt}); }
+
+  pair<ll, i128> get_range(np c, ll L, ll R) { return seg.prod(c, L, R); }
+  pair<ll, i128> get_all(np c) { return seg.prod_all(c); }
+
+  // (k-th val or infty), sum
+  pair<ll, i128> prefix_kth(np c, ll k) {
+    auto [cnt, sm] = seg.prod_all(c);
+    assert(k <= cnt);
+    if (k == cnt) return {infty<ll>, sm};
+    ll key = seg.max_right(
+        c, [&](auto e) -> bool { return e.fi <= k; }, -infty<ll>);
+    tie(cnt, sm) = seg.prod(c, -infty<ll>, key);
+    return {key, sm + key * (k - cnt)};
   }
 
-  int size() { return sz; }
-  vc<T> get_all() {
-    vc<T> res;
-    for (auto&& x: dat) res.insert(res.end(), all(x));
-    return res;
-  }
-
-  void rebuild() { build(get_all()); }
-
-  void insert(T x) {
-    if (sz == 0) {
-      dat[0].eb(x);
-      ++sz, sm[0] += x, sm_all += x;
-      return;
-    }
-    FOR(idx, len(dat)) {
-      if (dat[idx].back() < x && idx < len(dat) - 1) continue;
-      dat[idx].insert(lower_bound(all(dat[idx]), x), x);
-      ++sz, sm[idx] += x, sm_all += x;
-      if (len(dat[idx]) > len(dat) * REBUILD_RATIO) rebuild();
-      break;
-    }
-  }
-  void add(T x) { insert(x); }
-
-  void erase(T x) {
-    FOR(idx, len(dat)) {
-      if (dat[idx].back() < x && idx < len(dat) - 1) continue;
-      dat[idx].erase(lower_bound(all(dat[idx]), x));
-      --sz, sm[idx] -= x, sm_all -= x;
-      if (len(dat[idx]) == 0 && len(dat) > 0) {
-        dat.erase(dat.begin() + idx);
-        sm.erase(sm.begin() + idx);
-      }
-      break;
-    }
-  }
-  void remove(T x) { erase(x); }
-
-  int count(T x) {
-    int cnt = 0;
-    FOR(idx, len(dat)) {
-      if (dat[idx].back() < x) continue;
-      if (dat[idx][0] > x) break;
-      if (dat[idx][0] == dat[idx].back())
-        cnt += len(dat[idx]);
-      else
-        cnt += upper_bound(all(dat[idx]), x) - lower_bound(all(dat[idx]), x);
-    }
-    return cnt;
-  }
-
-  // {value[k], sum[0:k]}
-  pair<VAL, SM> get_kth(int k, bool suffix = false) {
-    assert(0 <= k && k <= sz);
-    if (suffix) {
-      if (k == sz) return {-infty<VAL>, sm_all};
-      auto [x, s] = get_kth(sz - k - 1);
-      return {x, sm_all - s - x};
-    }
-    SM s = 0;
-    FOR(idx, len(dat)) {
-      if (k >= len(dat[idx])) {
-        k -= len(dat[idx]);
-        s += sm[idx];
-        continue;
-      }
-      FOR(j, k) s += dat[idx][j];
-      return {dat[idx][k], s};
-    }
-    return {infty<VAL>, s};
-  }
-
-  // [lo, hi) で {cnt, sm}
-  pair<int, SM> get_range(T lo, T hi) {
-    if (sz == 0) return {0, 0};
-    int cnt = 0;
-    SM s = 0;
-    FOR(idx, len(dat)) {
-      if (dat[idx].back() < lo) continue;
-      if (hi <= dat[idx][0]) break;
-      if (lo <= dat[idx][0] && dat[idx].back() < hi) {
-        cnt += len(dat[idx]), s += sm[idx];
-        continue;
-      }
-      for (auto&& x: dat[idx])
-        if (lo <= x && x < hi) ++cnt, s += x;
-    }
-    return {cnt, s};
+  // (k-th val or -infty), sum
+  pair<ll, i128> suffix_kth(np c, ll k) {
+    auto [cnt, sm] = seg.prod_all(c);
+    assert(k <= cnt);
+    if (k == cnt) return {-infty<ll>, sm};
+    auto [a, b] = prefix_kth(c, cnt - 1 - k);
+    return {a, sm - b - a};
   }
 };

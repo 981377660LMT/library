@@ -1,7 +1,6 @@
 #include "ds/fastset.hpp"
 
 // int 列を扱う. key の重複可.
-template <int NODES>
 struct Sortable_Array {
   const int N, KEY_MAX;
 
@@ -10,6 +9,7 @@ struct Sortable_Array {
     Node *l, *r;
   };
   Node* pool;
+  const int NODES;
   int pid;
   using np = Node*;
 
@@ -17,11 +17,11 @@ struct Sortable_Array {
   vector<np> root; // 区間の左端に、dynamic segtree の node を乗せる
   vector<bool> rev;
 
-  Sortable_Array(int KEY_MAX, vector<int> key)
-      : N(key.size()), KEY_MAX(KEY_MAX), pid(0), ss(key.size()) {
+  Sortable_Array(int NODES, int KEY_MAX, vector<int> key) : N(key.size()), KEY_MAX(KEY_MAX), NODES(NODES), pid(0), ss(key.size()) {
     pool = new Node[NODES];
     init(key);
   }
+  ~Sortable_Array() { delete[] pool; }
 
   void set(int i, int key) {
     assert(0 <= key && key < KEY_MAX);
@@ -87,8 +87,8 @@ struct Sortable_Array {
 private:
   void init(vector<int>& key) {
     rev.assign(N, 0), root.clear(), root.reserve(N);
+    ss.build(N, [&](int i) -> int { return 1; });
     for (int i = 0; i < N; ++i) {
-      ss.insert(i);
       root.eb(new_node(0));
       assert(key[i] < KEY_MAX);
       set_rec(root[i], 0, KEY_MAX, key[i]);

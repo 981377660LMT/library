@@ -42,28 +42,29 @@ struct Doubling {
   // (to, val)
   pair<int, X> calc(int i, ll step) {
     assert(is_prepared);
-    assert(step < (1LL << LOG));
+    assert(0 <= step && step < (1LL << LOG));
     X x = Monoid::unit();
-    FOR(k, LOG) {
-      if (i == -1) break;
-      if (step & 1LL << k) {
-        x = Monoid::op(x, DP[k][i]);
-        i = TO[k][i];
-      }
+    while (step && i != -1) {
+      int k = topbit(step);
+      step ^= 1LL << k;
+      x = Monoid::op(x, DP[k][i]);
+      i = TO[k][i];
     }
     return {i, x};
   }
 
+  // check(to, monoid_sum)
   template <typename F>
   ll max_step(F check, int i) {
     assert(is_prepared);
     X x = Monoid::unit();
     ll step = 0;
-    assert(check(x));
+    assert(check(i, x));
     FOR_R(k, LOG) {
       int j = TO[k][i];
+      if (j == -1) continue;
       X y = Monoid::op(x, DP[k][i]);
-      if (check(y)) {
+      if (check(j, y)) {
         step |= 1LL << k;
         i = j;
         x = y;

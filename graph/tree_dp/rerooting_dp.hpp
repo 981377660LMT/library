@@ -1,18 +1,17 @@
-
+#pragma once
 #include "graph/base.hpp"
 #include "graph/tree.hpp"
 
 template <typename TREE, typename Data>
 struct Rerooting_dp {
+  static_assert(!TREE::Graph_type::is_directed);
   TREE& tree;
   vc<Data> dp_1; // 辺 pv に対して、部分木 v
   vc<Data> dp_2; // 辺 pv に対して、部分木 p
   vc<Data> dp;   // full tree
 
   template <typename F1, typename F2, typename F3>
-  Rerooting_dp(TREE& tree, F1 f_ee, F2 f_ev, F3 f_ve, const Data unit)
-      : tree(tree) {
-    assert(!tree.G.is_directed());
+  Rerooting_dp(TREE& tree, F1 f_ee, F2 f_ev, F3 f_ve, const Data unit) : tree(tree) {
     build(f_ee, f_ev, f_ve, unit);
   }
 
@@ -20,7 +19,7 @@ struct Rerooting_dp {
   Data operator[](int v) { return dp[v]; }
 
   // root を根としたときの部分木 v
-  Data get(int root, int v) {
+  Data get(int v, int root) {
     if (root == v) return dp[v];
     if (!tree.in_subtree(root, v)) { return dp_1[v]; }
     int w = tree.jump(v, root, 1);

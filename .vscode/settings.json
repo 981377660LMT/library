@@ -82,6 +82,14 @@
         "compare": "cpp",
         "concepts": "cpp",
         "coroutine": "cpp",
-        "stop_token": "cpp"
+        "stop_token": "cpp",
+        "tmp": "cpp",
+        "cassert": "cpp",
+        "rope": "cpp",
+        "dynamic_bitset": "cpp"
+    },
+    "[python]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
     }
 }

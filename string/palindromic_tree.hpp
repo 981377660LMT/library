@@ -19,7 +19,6 @@ struct Palindromic_Tree {
   Palindromic_Tree(const STRING& S, char off) {
     nodes.eb(Node(-1, -1, 0, -1));
     nodes.eb(Node(0, 0, 0, 0));
-    path = {0};
     int p = 0;
     FOR(i, len(S)) {
       path.eb(p);
@@ -48,7 +47,7 @@ struct Palindromic_Tree {
         while (1) {
           p = nodes[p].link;
           int j = i - 1 - nodes[p].length;
-          bool can = (j >= 0 && S[j] - off == x) || (p == 0);
+          bool can = (j >= 0 && S[j] - off == x);
           if (can) break;
         }
         assert(nodes[p].TO[x] != -1);
@@ -60,6 +59,7 @@ struct Palindromic_Tree {
     path.eb(p);
   }
 
+  // node ごとの出現回数
   vc<int> count() {
     vc<int> res(len(nodes));
     for (auto&& p: path) res[p]++;

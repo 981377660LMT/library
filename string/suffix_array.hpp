@@ -2,17 +2,25 @@
 
 #include "alg/monoid/min.hpp"
 #include "ds/sparse_table/sparse_table.hpp"
+#include "ds/segtree/segtree.hpp"
 
 // 辞書順 i 番目の suffix が j 文字目始まりであるとき、
 // SA[i] = j, ISA[j] = i
+// |S|>0 を前提（そうでない場合 dummy 文字を追加して利用せよ）
+template <bool USE_SPARSE_TABLE = true>
 struct Suffix_Array {
   vc<int> SA;
   vc<int> ISA;
   vc<int> LCP;
-  Sparse_Table<Monoid_Min<int>> seg;
-  // DisjointSparse<Monoid_Min<int>> seg;
+  using Mono = Monoid_Min<int>;
+  using SegType = conditional_t<USE_SPARSE_TABLE, Sparse_Table<Mono>, SegTree<Mono> >;
+  SegType seg;
+  bool build_seg;
 
-  Suffix_Array(string& s, bool lcp_query = false) {
+  Suffix_Array() {}
+  Suffix_Array(string& s) {
+    build_seg = 0;
+    assert(len(s) > 0);
     char first = 127, last = 0;
     for (auto&& c: s) {
       chmin(first, c);
@@ -20,17 +28,21 @@ struct Suffix_Array {
     }
     SA = calc_suffix_array(s, first, last);
     calc_LCP(s);
-    if (lcp_query) seg.build(LCP);
   }
 
-  Suffix_Array(vc<int>& s, bool lcp_query = false) {
+  Suffix_Array(vc<int>& s) {
+    build_seg = 0;
+    assert(len(s) > 0);
     SA = calc_suffix_array(s);
     calc_LCP(s);
-    if (lcp_query) seg.build(LCP);
   }
 
   // lcp(S[i:], S[j:])
   int lcp(int i, int j) {
+    if (!build_seg) {
+      build_seg = true;
+      seg.build(LCP);
+    }
     int n = len(SA);
     if (i == n || j == n) return 0;
     if (i == j) return n - i;
@@ -39,9 +51,32 @@ struct Suffix_Array {
     return seg.prod(i, j);
   }
 
+  // S[i:] との lcp が n 以上であるような半開区間
+  pair<int, int> lcp_range(int i, int n) {
+    if (!build_seg) {
+      build_seg = true;
+      seg.build(LCP);
+    }
+    i = ISA[i];
+    int a = seg.min_left([&](auto e) -> bool { return e >= n; }, i);
+    int b = seg.max_right([&](auto e) -> bool { return e >= n; }, i);
+    return {a, b + 1};
+  }
+
+  // -1: S[L1:R1) < S[L2, R2)
+  //  0: S[L1:R1) = S[L2, R2)
+  // +1: S[L1:R1) > S[L2, R2)
+  int compare(int L1, int R1, int L2, int R2) {
+    int n1 = R1 - L1, n2 = R2 - L2;
+    int n = lcp(L1, L2);
+    if (n == n1 && n == n2) return 0;
+    if (n == n1) return -1;
+    if (n == n2) return 1;
+    return (ISA[L1 + n] > ISA[L2 + n] ? 1 : -1);
+  }
+
 private:
-  void induced_sort(const vc<int>& vect, int val_range, vc<int>& SA,
-                    const vc<bool>& sl, const vc<int>& lms_idx) {
+  void induced_sort(const vc<int>& vect, int val_range, vc<int>& SA, const vc<bool>& sl, const vc<int>& lms_idx) {
     vc<int> l(val_range, 0), r(val_range, 0);
     for (int c: vect) {
       if (c + 1 < val_range) ++l[c + 1];
@@ -50,8 +85,7 @@ private:
     partial_sum(l.begin(), l.end(), l.begin());
     partial_sum(r.begin(), r.end(), r.begin());
     fill(SA.begin(), SA.end(), -1);
-    for (int i = (int)lms_idx.size() - 1; i >= 0; --i)
-      SA[--r[vect[lms_idx[i]]]] = lms_idx[i];
+    for (int i = (int)lms_idx.size() - 1; i >= 0; --i) SA[--r[vect[lms_idx[i]]]] = lms_idx[i];
     for (int i: SA)
       if (i >= 1 && sl[i - 1]) SA[l[vect[i - 1]]++] = i - 1;
     fill(r.begin(), r.end(), 0);
@@ -74,9 +108,7 @@ private:
     induced_sort(vect, val_range, SA, sl, lms_idx);
     vc<int> new_lms_idx(lms_idx.size()), lms_vec(lms_idx.size());
     for (int i = 0, k = 0; i < n; ++i)
-      if (!sl[SA[i]] && SA[i] >= 1 && sl[SA[i] - 1]) {
-        new_lms_idx[k++] = SA[i];
-      }
+      if (!sl[SA[i]] && SA[i] >= 1 && sl[SA[i] - 1]) { new_lms_idx[k++] = SA[i]; }
     int cur = 0;
     SA[n - 1] = cur;
     for (size_t k = 1; k < new_lms_idx.size(); ++k) {
@@ -101,16 +133,13 @@ private:
     for (size_t i = 0; i < lms_idx.size(); ++i) lms_vec[i] = SA[lms_idx[i]];
     if (cur + 1 < (int)lms_idx.size()) {
       auto lms_SA = SA_IS(lms_vec, cur + 1);
-      for (size_t i = 0; i < lms_idx.size(); ++i) {
-        new_lms_idx[i] = lms_idx[lms_SA[i]];
-      }
+      for (size_t i = 0; i < lms_idx.size(); ++i) { new_lms_idx[i] = lms_idx[lms_SA[i]]; }
     }
     induced_sort(vect, val_range, SA, sl, new_lms_idx);
     return SA;
   }
 
-  vc<int> calc_suffix_array(const string& s, const char first = 'a',
-                            const char last = 'z') {
+  vc<int> calc_suffix_array(const string& s, const char first = 'a', const char last = 'z') {
     vc<int> vect(s.size() + 1);
     copy(begin(s), end(s), begin(vect));
     for (auto& x: vect) x -= (int)first - 1;

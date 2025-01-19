@@ -1,23 +1,22 @@
 #pragma once
+
+#include "random/base.hpp"
 #include "nt/primetest.hpp"
 
-mt19937_64 rng_mt{random_device{}()};
-ll rnd(ll n) { return uniform_int_distribution<ll>(0, n - 1)(rng_mt); }
-
+template <typename mint>
 ll rho(ll n, ll c) {
-  m64::set_mod(n);
   assert(n > 1);
-  const m64 cc(c);
-  auto f = [&](m64 x) { return x * x + cc; };
-  m64 x = 1, y = 2, z = 1, q = 1;
+  const mint cc(c);
+  auto f = [&](mint x) { return x * x + cc; };
+  mint x = 1, y = 2, z = 1, q = 1;
   ll g = 1;
-  const ll m = 1LL << (__lg(n) / 5); // ?
+  const ll m = 1LL << (__lg(n) / 5);
   for (ll r = 1; g == 1; r <<= 1) {
     x = y;
-    FOR(_, r) y = f(y);
-    for (ll k = 0; k < r and g == 1; k += m) {
+    FOR(r) y = f(y);
+    for (ll k = 0; k < r && g == 1; k += m) {
       z = y;
-      FOR(_, min(m, r - k)) y = f(y), q *= x - y;
+      FOR(min(m, r - k)) y = f(y), q *= x - y;
       g = gcd(q.val(), n);
     }
   }
@@ -31,13 +30,21 @@ ll rho(ll n, ll c) {
 ll find_prime_factor(ll n) {
   assert(n > 1);
   if (primetest(n)) return n;
-  FOR(_, 100) {
-    ll m = rho(n, rnd(n));
+  FOR(100) {
+    ll m = 0;
+    if (n < (1 << 30)) {
+      using mint = Mongomery_modint_32<20231025>;
+      mint::set_mod(n);
+      m = rho<mint>(n, RNG(0, n));
+    } else {
+      using mint = Mongomery_modint_64<20231025>;
+      mint::set_mod(n);
+      m = rho<mint>(n, RNG(0, n));
+    }
     if (primetest(m)) return m;
     n = m;
   }
-  cerr << "failed" << endl;
-  assert(false);
+  assert(0);
   return -1;
 }
 
@@ -45,7 +52,7 @@ ll find_prime_factor(ll n) {
 vc<pair<ll, int>> factor(ll n) {
   assert(n >= 1);
   vc<pair<ll, int>> pf;
-  FOR3(p, 2, 100) {
+  FOR(p, 2, 100) {
     if (p * p > n) break;
     if (n % p == 0) {
       ll e = 0;

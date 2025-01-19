@@ -23,16 +23,22 @@ struct RollingHash {
   template <typename STRING>
   vector<mint> build(const STRING& s) const {
     int sz = s.size();
-    vector<mint> hashed(sz + 1);
+    vector<mint> hashed(sz + 1, mint(0));
     for (int i = 0; i < sz; i++) { hashed[i + 1] = hashed[i] * base + s[i]; }
     return hashed;
   }
 
-  mint from_char(char x) { return x; }
+  template <typename STRING>
+  mint eval(STRING& s) {
+    mint x = 0;
+    for (auto& ch: s) x = base * x + ch;
+    return x;
+  }
 
   mint query(const vc<mint>& s, int l, int r) {
+    assert(0 <= l && l <= r && r < len(s));
     expand(r - l);
-    return (s[r] - s[l] * power[r - l]).val;
+    return (s[r] - s[l] * power[r - l]);
   }
 
   mint combine(mint h1, mint h2, int h2len) {

@@ -11,19 +11,10 @@ struct Intervals_Fast {
   vc<T> dat;
   FastSet ss;
 
-  Intervals_Fast(int N, T none_val)
-      : LLIM(0),
-        RLIM(N),
-        none_val(none_val),
-        total_num(0),
-        total_len(0),
-        dat(N, none_val),
-        ss(N) {
-    ss.insert(0);
-  }
+  Intervals_Fast(int N, T none_val) : LLIM(0), RLIM(N), none_val(none_val), total_num(0), total_len(0), dat(N, none_val), ss(N) { ss.insert(0); }
 
-  // x を含む区間の情報の取得
-  tuple<int, int, T> get(int x, bool ERASE) {
+  // x を含む区間の情報の取得 l, r, t
+  tuple<int, int, T> get(int x, bool ERASE = false) {
     int l = ss.prev(x);
     int r = ss.next(x + 1);
     T t = dat[l];
@@ -39,7 +30,7 @@ struct Intervals_Fast {
   // [L, R) 内の全データの取得
   // f(l,r,x)
   template <typename F>
-  void enumerate_range(int L, int R, F f, bool ERASE) {
+  void enumerate_range(int L, int R, F f, bool ERASE = false) {
     assert(LLIM <= L && L <= R && R <= RLIM);
     if (L == R) return;
     if (!ERASE) {
@@ -106,11 +97,13 @@ struct Intervals_Fast {
 // https://codeforces.com/contest/1638/problem/E
 // 持つ値のタイプ T、座標タイプ X
 // コンストラクタでは T none_val を指定する
+// 先読み可能なら座圧して fastset の方が速い
 template <typename T, typename X = ll>
 struct Intervals {
   static constexpr X LLIM = -infty<X>;
   static constexpr X RLIM = infty<X>;
-  const T none_val;
+  T none_val;
+  // const T none_val;
   // none_val でない区間の個数と長さ合計
   int total_num;
   X total_len;
@@ -121,8 +114,8 @@ struct Intervals {
     dat[RLIM] = none_val;
   }
 
-  // x を含む区間の情報の取得
-  tuple<X, X, T> get(X x, bool ERASE) {
+  // x を含む区間の情報の取得 l, r, t
+  tuple<X, X, T> get(X x, bool ERASE = false) {
     auto it2 = dat.upper_bound(x);
     auto it1 = prev(it2);
     auto [l, tl] = *it1;
@@ -136,9 +129,9 @@ struct Intervals {
     return {l, r, tl};
   }
 
-  // [L, R) 内の全データの取得
+  // [L, R) 内の全データの取得 f(l, r, t)
   template <typename F>
-  void enumerate_range(X L, X R, F f, bool ERASE) {
+  void enumerate_range(X L, X R, F f, bool ERASE = false) {
     assert(LLIM <= L && L <= R && R <= RLIM);
     if (!ERASE) {
       auto it = prev(dat.upper_bound(L));
@@ -174,6 +167,8 @@ struct Intervals {
   }
 
   void set(X L, X R, T t) {
+    assert(L <= R);
+    if (L == R) return;
     enumerate_range(
         L, R, [](int l, int r, T x) -> void {}, true);
     dat[L] = t;

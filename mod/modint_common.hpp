@@ -19,7 +19,7 @@ mint inv(int n) {
   while (len(dat) <= n) {
     int k = len(dat);
     int q = (mod + k - 1) / k;
-    dat.eb(dat[k * q - mod] * mint(q));
+    dat.eb(dat[k * q - mod] * mint::raw(q));
   }
   return dat[n];
 }
@@ -27,10 +27,9 @@ mint inv(int n) {
 template <typename mint>
 mint fact(int n) {
   static const int mod = mint::get_mod();
-  assert(0 <= n);
-  if (n >= mod) return 0;
+  assert(0 <= n && n < mod);
   static vector<mint> dat = {1, 1};
-  while (len(dat) <= n) dat.eb(dat[len(dat) - 1] * mint(len(dat)));
+  while (len(dat) <= n) dat.eb(dat[len(dat) - 1] * mint::raw(len(dat)));
   return dat[n];
 }
 
@@ -54,6 +53,8 @@ mint multinomial(Head &&head, Tail &&... tail) {
 
 template <typename mint>
 mint C_dense(int n, int k) {
+  assert(n >= 0);
+  if (k < 0 || n < k) return 0;
   static vvc<mint> C;
   static int H = 0, W = 0;
   auto calc = [&](int i, int j) -> mint {
@@ -82,8 +83,8 @@ template <typename mint, bool large = false, bool dense = false>
 mint C(ll n, ll k) {
   assert(n >= 0);
   if (k < 0 || n < k) return 0;
-  if (dense) return C_dense<mint>(n, k);
-  if (!large) return multinomial<mint>(n, k, n - k);
+  if constexpr (dense) return C_dense<mint>(n, k);
+  if constexpr (!large) return multinomial<mint>(n, k, n - k);
   k = min(k, n - k);
   mint x(1);
   FOR(i, k) x *= mint(n - i);
@@ -98,7 +99,7 @@ mint C_inv(ll n, ll k) {
   return mint(1) / C<mint, 1>(n, k);
 }
 
-// [x^d] (1-x) ^ {-n} の計算
+// [x^d](1-x)^{-n}
 template <typename mint, bool large = false, bool dense = false>
 mint C_negative(ll n, ll d) {
   assert(n >= 0);
